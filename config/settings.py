@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "drf_spectacular",
     "accounts",
+    "orientations",
 ]
 
 # Modèle utilisateur personnalisé utilisé par AdmiGuide.
