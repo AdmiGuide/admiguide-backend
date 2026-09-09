@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "accounts",
     "orientations",
+    "referentiel",
 ]
 
 # Modèle utilisateur personnalisé utilisé par AdmiGuide.
