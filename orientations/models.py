@@ -28,6 +28,7 @@ class SituationAdministrative(models.Model):
     )
 
     description_initiale = models.TextField(
+        max_length=2000,
         verbose_name="description initiale",
     )
 

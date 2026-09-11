@@ -72,6 +72,13 @@ class DemarcheAdministrative(models.Model):
     recommandée à l'usager à la suite de l'analyse de sa situation.
     """
 
+    # Identifiant métier stable utilisé entre Django, FastAPI et ChromaDB.
+    code = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name="code de la démarche",
+    )
+
     intitule = models.CharField(
         max_length=255,
         verbose_name="intitulé",
