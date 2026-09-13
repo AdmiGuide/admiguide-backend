@@ -1,7 +1,7 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, APIException
 
 from .models import (
     QuestionComplementaire,
@@ -18,9 +18,38 @@ from .serializers import (
     SituationUpdateSerializer,
 )
 
+# Services utilisés pour communiquer avec AdmiGuide AI.
+from .services.ai_service import AIServiceError
+from .services.orientation_service import (
+    OrientationServiceError,
+    analyser_et_enregistrer,
+)
+
 # Permet d'enregistrer plusieurs réponses dans une seule transaction.
 from django.db import transaction
 
+class AIServiceUnavailable(APIException):
+    """Erreur retournée lorsque le microservice IA est indisponible."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_detail = "Le service d'analyse est temporairement indisponible."
+    default_code = "ai_service_unavailable"
+
+
+def lancer_analyse(situation):
+    """Lance l'analyse IA et transforme les erreurs techniques en erreurs API."""
+
+    try:
+        return analyser_et_enregistrer(situation)
+
+    except AIServiceError as exc:
+        raise AIServiceUnavailable() from exc
+
+    except OrientationServiceError as exc:
+        raise APIException(str(exc)) from exc
+
+
+    
 class SituationCreateView(generics.CreateAPIView):
     """
     Permet à un visiteur ou à un utilisateur connecté
@@ -33,16 +62,29 @@ class SituationCreateView(generics.CreateAPIView):
     # Le parcours d'orientation est accessible sans compte.
     permission_classes = [AllowAny]
 
-    def perform_create(self, serializer):
-        """
-        Associe automatiquement la situation à l'utilisateur
-        lorsqu'il est authentifié.
-        """
+    def create(self, request, *args, **kwargs):
+        """Enregistre la situation puis lance automatiquement son analyse."""
 
-        if self.request.user.is_authenticated:
-            serializer.save(utilisateur=self.request.user)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Associe la situation au compte si l'utilisateur est connecté.
+        if request.user.is_authenticated:
+            situation = serializer.save(utilisateur=request.user)
         else:
-            serializer.save()
+            situation = serializer.save()
+
+        # Lance l'analyse avec AdmiGuide AI.
+        analyse = lancer_analyse(situation)
+
+        # Retourne la situation ainsi que le premier résultat de l'analyse.
+        donnees = dict(serializer.data)
+        donnees["analyse"] = analyse
+
+        return Response(
+            donnees,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 
@@ -156,9 +198,10 @@ class QuestionListView(generics.ListAPIView):
             self.kwargs["public_id"],
         )
 
-        # Retourne les questions liées à cette situation dans le bon ordre.
+        # Retourne uniquement les questions encore sans réponse.
         return QuestionComplementaire.objects.filter(
-            situation=situation
+            situation=situation,
+            reponse__isnull=True,
         ).order_by("ordre")
 
 
@@ -247,11 +290,14 @@ class ReponseComplementaireView(generics.GenericAPIView):
                         "contenu": reponse.contenu,
                     }
                 )
+        # Relance l'analyse avec les nouvelles réponses enregistrées.
+        analyse = lancer_analyse(situation)
 
         return Response(
             {
                 "detail": "Réponses enregistrées.",
                 "reponses": reponses_enregistrees,
+                "analyse": analyse,
             },
             status=status.HTTP_200_OK,
         )

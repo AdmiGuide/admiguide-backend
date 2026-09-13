@@ -27,9 +27,19 @@ class SituationAdministrative(models.Model):
         related_name="situations",
     )
 
+        # Description de la situation fournie par l'usager.
     description_initiale = models.TextField(
         max_length=1500,
         verbose_name="description initiale",
+    )
+
+    # Pays dans lequel la démarche doit être effectuée.
+    # Exemples : SN, FR ou ETRANGER.
+    pays_application = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        verbose_name="pays d'application",
     )
 
     date_creation = models.DateTimeField(

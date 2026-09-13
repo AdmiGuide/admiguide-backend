@@ -187,3 +187,9 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Documentation de l'API métier du projet AdmiGuide.",
     "VERSION": "1.0.0",
 }
+
+# URL du microservice AdmiGuide AI.
+AI_SERVICE_URL = os.getenv(
+    "AI_SERVICE_URL",
+    "http://127.0.0.1:8001",
+).rstrip("/")

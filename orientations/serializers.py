@@ -18,6 +18,7 @@ class SituationCreateSerializer(serializers.ModelSerializer):
             "id",
             "public_id",
             "description_initiale",
+            "pays_application",
             "date_creation",
         ]
 
