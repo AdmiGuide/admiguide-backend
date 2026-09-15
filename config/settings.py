@@ -60,6 +60,8 @@ INSTALLED_APPS = [
     "accounts",
     "orientations",
     "referentiel",
+    # Autorise les appels venant du frontend Angular.
+    "corsheaders",
 ]
 
 # Modèle utilisateur personnalisé utilisé par AdmiGuide.
@@ -67,12 +69,22 @@ AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+
+    # Gère les autorisations CORS.
+    "corsheaders.middleware.CorsMiddleware",
+
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+# Frontends autorisés à appeler l'API en développement.
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:4200",
+    "http://127.0.0.1:4200",
 ]
 
 ROOT_URLCONF = 'config.urls'
