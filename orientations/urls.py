@@ -7,6 +7,7 @@ from .views import (
     SituationHistoryView,
     SituationResultView,
     SituationUpdateView,
+    SuiviEtapeUpdateView,
 )
 
 urlpatterns = [
@@ -47,5 +48,12 @@ urlpatterns = [
         "situations/<uuid:public_id>/",
         SituationUpdateView.as_view(),
         name="situation-update",
+    ),
+
+    # Permet de mettre à jour une étape de la feuille de route.
+    path(
+        "situations/<uuid:public_id>/etapes/<int:etape_id>/",
+        SuiviEtapeUpdateView.as_view(),
+        name="situation-etape-update",
     ),
 ]

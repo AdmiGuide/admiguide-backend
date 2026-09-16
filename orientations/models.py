@@ -1,7 +1,7 @@
 from django.db import models
 from django.conf import settings
 import uuid
-from referentiel.models import DemarcheAdministrative
+from referentiel.models import DemarcheAdministrative, EtapeDemarche
 
 class SituationAdministrative(models.Model):
     """
@@ -174,3 +174,43 @@ class OrientationAdministrative(models.Model):
     def __str__(self):
         """Retourne la situation associée à l'orientation."""
         return f"Orientation de la situation {self.situation_id}"
+
+
+
+class SuiviEtape(models.Model):
+    """Enregistre l'avancement d'une étape pour une orientation."""
+
+    orientation = models.ForeignKey(
+        OrientationAdministrative,
+        on_delete=models.CASCADE,
+        related_name="suivis_etapes",
+    )
+
+    etape = models.ForeignKey(
+        EtapeDemarche,
+        on_delete=models.CASCADE,
+        related_name="suivis",
+    )
+
+    terminee = models.BooleanField(
+        default=False,
+        verbose_name="étape terminée",
+    )
+
+    date_mise_a_jour = models.DateTimeField(
+        auto_now=True,
+        verbose_name="date de mise à jour",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["orientation", "etape"],
+                name="unique_suivi_etape_orientation",
+            )
+        ]
+
+    def __str__(self):
+        """Retourne l'étape suivie et son état."""
+        etat = "terminée" if self.terminee else "à faire"
+        return f"{self.etape} - {etat}"

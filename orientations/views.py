@@ -4,9 +4,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import NotFound, APIException
 
 from .models import (
+    OrientationAdministrative,
     QuestionComplementaire,
     ReponseComplementaire,
     SituationAdministrative,
+    SuiviEtape,
     TypeQuestion,
 )
 from .serializers import (
@@ -16,6 +18,7 @@ from .serializers import (
     SituationHistorySerializer,
     SituationResultSerializer,
     SituationUpdateSerializer,
+    SuiviEtapeUpdateSerializer,
 )
 
 # Services utilisés pour communiquer avec AdmiGuide AI.
@@ -24,6 +27,8 @@ from .services.orientation_service import (
     OrientationServiceError,
     analyser_et_enregistrer,
 )
+
+from referentiel.models import EtapeDemarche
 
 # Permet d'enregistrer plusieurs réponses dans une seule transaction.
 from django.db import transaction
@@ -302,6 +307,97 @@ class ReponseComplementaireView(generics.GenericAPIView):
             status=status.HTTP_200_OK,
         )
 
+
+
+class SuiviEtapeUpdateView(generics.GenericAPIView):
+    """
+    Permet à un utilisateur connecté de cocher
+    ou décocher une étape de sa feuille de route.
+    """
+
+    serializer_class = SuiviEtapeUpdateSerializer
+    permission_classes = [IsAuthenticated]
+
+    # Seule la modification partielle est nécessaire.
+    http_method_names = ["patch", "options"]
+
+    def patch(self, request, public_id, etape_id):
+        """Met à jour l'état d'une étape."""
+
+        # La progression est réservée au propriétaire de la situation.
+        situation = (
+            SituationAdministrative.objects
+            .filter(
+                public_id=public_id,
+                utilisateur=request.user,
+            )
+            .select_related(
+                "orientation",
+                "orientation__demarche",
+            )
+            .first()
+        )
+
+        if not situation:
+            raise NotFound("Situation introuvable.")
+
+        try:
+            orientation = situation.orientation
+        except OrientationAdministrative.DoesNotExist:
+            raise NotFound("Orientation introuvable.")
+
+        if not orientation.demarche:
+            raise NotFound("Démarche introuvable.")
+
+        # Vérifie que l'étape appartient bien à la démarche recommandée.
+        try:
+            etape = EtapeDemarche.objects.get(
+                id=etape_id,
+                demarche=orientation.demarche,
+            )
+        except EtapeDemarche.DoesNotExist:
+            raise NotFound("Étape introuvable.")
+
+        # Valide la valeur true/false reçue.
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Crée le suivi ou met à jour celui qui existe déjà.
+        suivi, _ = SuiviEtape.objects.update_or_create(
+            orientation=orientation,
+            etape=etape,
+            defaults={
+                "terminee": serializer.validated_data["terminee"],
+            },
+        )
+
+        # Calcule la progression globale.
+        total = orientation.demarche.etapes.count()
+
+        terminees = SuiviEtape.objects.filter(
+            orientation=orientation,
+            etape__demarche=orientation.demarche,
+            terminee=True,
+        ).count()
+
+        pourcentage = (
+            round((terminees / total) * 100)
+            if total > 0
+            else 0
+        )
+
+        return Response(
+            {
+                "etape_id": etape.id,
+                "terminee": suivi.terminee,
+                "progression": {
+                    "terminees": terminees,
+                    "total": total,
+                    "pourcentage": pourcentage,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 def get_accessible_situation(request, public_id):

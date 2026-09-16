@@ -3,6 +3,7 @@ from .models import (
     OrientationAdministrative,
     QuestionComplementaire,
     SituationAdministrative,
+    SuiviEtape,
 )
 from referentiel.models import StatutSource
 
@@ -38,6 +39,7 @@ class SituationResultSerializer(serializers.ModelSerializer):
     resume = serializers.SerializerMethodField()
     avertissement = serializers.SerializerMethodField()
     etapes = serializers.SerializerMethodField()
+    progression = serializers.SerializerMethodField()
     pieces_a_preparer = serializers.SerializerMethodField()
     services_competents = serializers.SerializerMethodField()
     sources = serializers.SerializerMethodField()
@@ -53,6 +55,7 @@ class SituationResultSerializer(serializers.ModelSerializer):
             "resume",
             "avertissement",
             "etapes",
+            "progression",
             "pieces_a_preparer",
             "services_competents",
             "sources",
@@ -117,20 +120,64 @@ class SituationResultSerializer(serializers.ModelSerializer):
         return None
 
     def get_etapes(self, obj):
-        """Retourne les étapes de la démarche dans leur ordre."""
+        """Retourne les étapes avec leur état d'avancement."""
 
+        orientation = self._get_orientation(obj)
         demarche = self._get_demarche(obj)
 
-        if not demarche:
+        if not orientation or not demarche:
             return []
+
+        # Récupère les étapes déjà cochées pour cette orientation.
+        suivis = {
+            suivi.etape_id: suivi.terminee
+            for suivi in SuiviEtape.objects.filter(
+                orientation=orientation
+            )
+        }
 
         return [
             {
+                "id": etape.id,
                 "ordre": etape.ordre,
                 "description": etape.description,
+                "terminee": suivis.get(etape.id, False),
             }
             for etape in demarche.etapes.all()
         ]
+
+    def get_progression(self, obj):
+        """Calcule la progression globale de la feuille de route."""
+
+        orientation = self._get_orientation(obj)
+        demarche = self._get_demarche(obj)
+
+        if not orientation or not demarche:
+            return {
+                "terminees": 0,
+                "total": 0,
+                "pourcentage": 0,
+            }
+
+        total = demarche.etapes.count()
+
+        terminees = SuiviEtape.objects.filter(
+            orientation=orientation,
+            etape__demarche=demarche,
+            terminee=True,
+        ).count()
+
+        pourcentage = (
+            round((terminees / total) * 100)
+            if total > 0
+            else 0
+        )
+
+        return {
+            "terminees": terminees,
+            "total": total,
+            "pourcentage": pourcentage,
+        }
 
     def get_pieces_a_preparer(self, obj):
         """Retourne les pièces et informations nécessaires."""
@@ -293,3 +340,10 @@ class SituationUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SituationAdministrative
         fields = ["description_initiale"]
+
+
+
+class SuiviEtapeUpdateSerializer(serializers.Serializer):
+    """Valide l'état d'une étape de la feuille de route."""
+
+    terminee = serializers.BooleanField()
