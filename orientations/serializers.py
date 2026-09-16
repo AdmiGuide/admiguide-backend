@@ -1,4 +1,5 @@
 from rest_framework import serializers
+
 from .models import (
     OrientationAdministrative,
     QuestionComplementaire,
@@ -9,9 +10,7 @@ from referentiel.models import StatutSource
 
 
 class SituationCreateSerializer(serializers.ModelSerializer):
-    """
-    Sérialise une situation administrative décrite par un usager.
-    """
+    """Sérialise une situation administrative décrite par un usager."""
 
     class Meta:
         model = SituationAdministrative
@@ -22,18 +21,13 @@ class SituationCreateSerializer(serializers.ModelSerializer):
             "pays_application",
             "date_creation",
         ]
-
-        # Ces champs sont générés automatiquement par Django.
         read_only_fields = ["id", "public_id", "date_creation"]
 
 
-
 class SituationResultSerializer(serializers.ModelSerializer):
-    """
-    Sérialise le résultat complet d'une orientation administrative
-    afin d'alimenter l'écran « Votre orientation ».
-    """
+    """Sérialise le résultat complet de l'orientation."""
 
+    pays_residence = serializers.SerializerMethodField()
     orientation_disponible = serializers.SerializerMethodField()
     demarche = serializers.SerializerMethodField()
     resume = serializers.SerializerMethodField()
@@ -49,6 +43,8 @@ class SituationResultSerializer(serializers.ModelSerializer):
         fields = [
             "public_id",
             "description_initiale",
+            "pays_application",
+            "pays_residence",
             "date_creation",
             "orientation_disponible",
             "demarche",
@@ -63,7 +59,6 @@ class SituationResultSerializer(serializers.ModelSerializer):
 
     def _get_orientation(self, obj):
         """Retourne l'orientation associée si elle existe."""
-
         try:
             return obj.orientation
         except OrientationAdministrative.DoesNotExist:
@@ -71,12 +66,15 @@ class SituationResultSerializer(serializers.ModelSerializer):
 
     def _get_demarche(self, obj):
         """Retourne la démarche recommandée si elle existe."""
-
         orientation = self._get_orientation(obj)
-
         if orientation and orientation.demarche:
             return orientation.demarche
+        return None
 
+    def get_pays_residence(self, obj):
+        """Retourne le pays de résidence du compte, lorsqu'il existe."""
+        if obj.utilisateur:
+            return obj.utilisateur.pays_residence
         return None
 
     def get_orientation_disponible(self, obj):
@@ -85,9 +83,7 @@ class SituationResultSerializer(serializers.ModelSerializer):
 
     def get_demarche(self, obj):
         """Retourne les informations principales de la démarche."""
-
         demarche = self._get_demarche(obj)
-
         if not demarche:
             return None
 
@@ -101,39 +97,25 @@ class SituationResultSerializer(serializers.ModelSerializer):
 
     def get_resume(self, obj):
         """Retourne le résumé généré pour l'usager."""
-
         orientation = self._get_orientation(obj)
-
-        if orientation:
-            return orientation.resume
-
-        return None
+        return orientation.resume if orientation else None
 
     def get_avertissement(self, obj):
         """Retourne l'avertissement associé au résultat."""
-
         orientation = self._get_orientation(obj)
-
-        if orientation:
-            return orientation.avertissement
-
-        return None
+        return orientation.avertissement if orientation else None
 
     def get_etapes(self, obj):
         """Retourne les étapes avec leur état d'avancement."""
-
         orientation = self._get_orientation(obj)
         demarche = self._get_demarche(obj)
 
         if not orientation or not demarche:
             return []
 
-        # Récupère les étapes déjà cochées pour cette orientation.
         suivis = {
             suivi.etape_id: suivi.terminee
-            for suivi in SuiviEtape.objects.filter(
-                orientation=orientation
-            )
+            for suivi in SuiviEtape.objects.filter(orientation=orientation)
         }
 
         return [
@@ -148,30 +130,20 @@ class SituationResultSerializer(serializers.ModelSerializer):
 
     def get_progression(self, obj):
         """Calcule la progression globale de la feuille de route."""
-
         orientation = self._get_orientation(obj)
         demarche = self._get_demarche(obj)
 
         if not orientation or not demarche:
-            return {
-                "terminees": 0,
-                "total": 0,
-                "pourcentage": 0,
-            }
+            return {"terminees": 0, "total": 0, "pourcentage": 0}
 
         total = demarche.etapes.count()
-
         terminees = SuiviEtape.objects.filter(
             orientation=orientation,
             etape__demarche=demarche,
             terminee=True,
         ).count()
 
-        pourcentage = (
-            round((terminees / total) * 100)
-            if total > 0
-            else 0
-        )
+        pourcentage = round((terminees / total) * 100) if total else 0
 
         return {
             "terminees": terminees,
@@ -181,9 +153,7 @@ class SituationResultSerializer(serializers.ModelSerializer):
 
     def get_pieces_a_preparer(self, obj):
         """Retourne les pièces et informations nécessaires."""
-
         demarche = self._get_demarche(obj)
-
         if not demarche:
             return []
 
@@ -197,9 +167,7 @@ class SituationResultSerializer(serializers.ModelSerializer):
 
     def get_services_competents(self, obj):
         """Retourne les services pouvant traiter la démarche."""
-
         demarche = self._get_demarche(obj)
-
         if not demarche:
             return []
 
@@ -217,15 +185,13 @@ class SituationResultSerializer(serializers.ModelSerializer):
 
     def get_sources(self, obj):
         """Retourne uniquement les sources actuellement disponibles."""
-
         demarche = self._get_demarche(obj)
-
         if not demarche:
             return []
 
         sources = demarche.sources.filter(
             statut=StatutSource.DISPONIBLE
-        )
+        ).order_by("titre")
 
         return [
             {
@@ -236,12 +202,8 @@ class SituationResultSerializer(serializers.ModelSerializer):
         ]
 
 
-
 class SituationHistorySerializer(serializers.ModelSerializer):
-    """
-    Sérialise une situation sous une forme adaptée
-    à l'écran « Mon historique ».
-    """
+    """Sérialise une situation pour l'écran « Mon historique »."""
 
     titre = serializers.SerializerMethodField()
     pays_residence = serializers.SerializerMethodField()
@@ -252,6 +214,7 @@ class SituationHistorySerializer(serializers.ModelSerializer):
         fields = [
             "public_id",
             "titre",
+            "pays_application",
             "pays_residence",
             "date_creation",
             "orientation_disponible",
@@ -259,44 +222,30 @@ class SituationHistorySerializer(serializers.ModelSerializer):
 
     def _get_orientation(self, obj):
         """Retourne l'orientation si elle existe."""
-
         try:
             return obj.orientation
         except OrientationAdministrative.DoesNotExist:
             return None
 
     def get_titre(self, obj):
-        """
-        Utilise l'intitulé de la démarche comme titre lorsque
-        l'orientation est disponible.
-        """
-
+        """Utilise l'intitulé de la démarche quand il est disponible."""
         orientation = self._get_orientation(obj)
 
         if orientation and orientation.demarche:
             return orientation.demarche.intitule
 
-        # Utilise temporairement un extrait de la situation
-        # lorsque l'orientation n'existe pas encore.
         texte = obj.description_initiale.strip()
-
-        if len(texte) > 60:
-            return f"{texte[:60]}..."
-
-        return texte
+        return f"{texte[:60]}..." if len(texte) > 60 else texte
 
     def get_pays_residence(self, obj):
         """Retourne le pays enregistré dans le profil utilisateur."""
-
         if obj.utilisateur:
             return obj.utilisateur.pays_residence
-
         return None
 
     def get_orientation_disponible(self, obj):
         """Indique si la situation possède déjà une orientation."""
         return self._get_orientation(obj) is not None
-
 
 
 class QuestionComplementaireSerializer(serializers.ModelSerializer):
@@ -326,12 +275,10 @@ class ReponseComplementaireInputSerializer(serializers.Serializer):
 class ReponsesComplementairesSerializer(serializers.Serializer):
     """Valide l'ensemble des réponses envoyées pour une situation."""
 
-    # Une situation peut recevoir plusieurs réponses en une seule requête.
     reponses = ReponseComplementaireInputSerializer(
         many=True,
         allow_empty=False,
     )
-
 
 
 class SituationUpdateSerializer(serializers.ModelSerializer):
@@ -340,7 +287,6 @@ class SituationUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SituationAdministrative
         fields = ["description_initiale"]
-
 
 
 class SuiviEtapeUpdateSerializer(serializers.Serializer):

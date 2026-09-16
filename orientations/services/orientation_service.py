@@ -1,17 +1,20 @@
-# Permet d'enregistrer plusieurs changements ensemble.
 from django.db import transaction
 
-# Modèles utilisés pour enregistrer le résultat de l'analyse.
 from orientations.models import (
     OrientationAdministrative,
     QuestionComplementaire,
 )
-
-# Référentiel des démarches connues par Django.
 from referentiel.models import DemarcheAdministrative
 
-# Service chargé de communiquer avec AdmiGuide AI.
 from .ai_service import analyser_situation
+
+
+MVP_DEMARCHE_CODES = {
+    "REMPLACEMENT_PASSEPORT_PERDU",
+    "RETOUR_EFFETS_PERSONNELS",
+    "NAISSANCE_ETRANGER",
+    "DECES_FONCTIONNAIRE",
+}
 
 
 class OrientationServiceError(Exception):
@@ -20,11 +23,9 @@ class OrientationServiceError(Exception):
 
 def _get_reponses(situation) -> list[dict]:
     """Prépare les réponses déjà données dans le format attendu par FastAPI."""
-
     reponses = []
 
     for question in situation.questions.all().order_by("ordre"):
-        # Ignore les questions auxquelles l'utilisateur n'a pas encore répondu.
         if not hasattr(question, "reponse"):
             continue
 
@@ -39,15 +40,10 @@ def _get_reponses(situation) -> list[dict]:
 
 
 def _enregistrer_questions(situation, questions: list[dict]) -> None:
-    """Enregistre les nouvelles questions demandées par AdmiGuide AI."""
-
+    """Remplace les questions encore sans réponse par les nouvelles."""
     with transaction.atomic():
-        # Supprime uniquement les anciennes questions restées sans réponse.
-        situation.questions.filter(
-            reponse__isnull=True
-        ).delete()
+        situation.questions.filter(reponse__isnull=True).delete()
 
-        # Continue l'ordre après les questions déjà répondues.
         dernier_ordre = (
             situation.questions
             .order_by("-ordre")
@@ -57,10 +53,18 @@ def _enregistrer_questions(situation, questions: list[dict]) -> None:
         )
 
         for index, question in enumerate(questions, start=1):
+            texte = question.get("texte")
+            type_question = question.get("type_question")
+
+            if not texte or not type_question:
+                raise OrientationServiceError(
+                    "AdmiGuide AI a retourné une question invalide."
+                )
+
             QuestionComplementaire.objects.create(
                 situation=situation,
-                texte=question["texte"],
-                type_question=question["type_question"],
+                texte=texte,
+                type_question=type_question,
                 options=question.get("options", []),
                 ordre=dernier_ordre + index,
             )
@@ -68,61 +72,69 @@ def _enregistrer_questions(situation, questions: list[dict]) -> None:
 
 def _enregistrer_orientation(situation, resultat: dict) -> None:
     """Enregistre l'orientation définitive retournée par AdmiGuide AI."""
+    code = resultat.get("demarche_code")
+    resume = resultat.get("resume")
 
-    code = resultat["demarche_code"]
+    if not code or not resume:
+        raise OrientationServiceError(
+            "AdmiGuide AI a retourné une orientation incomplète."
+        )
 
     try:
         demarche = DemarcheAdministrative.objects.get(code=code)
-
     except DemarcheAdministrative.DoesNotExist as exc:
         raise OrientationServiceError(
             f"La démarche {code} n'existe pas dans le référentiel."
         ) from exc
 
-    # Crée ou met à jour l'orientation de cette situation.
+    orientation_existante = OrientationAdministrative.objects.filter(
+        situation=situation
+    ).first()
+
+    # Une nouvelle démarche invalide l'ancien suivi des étapes.
+    if (
+        orientation_existante
+        and orientation_existante.demarche_id != demarche.id
+    ):
+        orientation_existante.suivis_etapes.all().delete()
+
     OrientationAdministrative.objects.update_or_create(
         situation=situation,
         defaults={
             "demarche": demarche,
-            "resume": resultat["resume"],
+            "resume": resume,
             "avertissement": resultat.get("avertissement", ""),
         },
     )
 
+    # Une orientation définitive rend inutiles les questions sans réponse.
+    situation.questions.filter(reponse__isnull=True).delete()
+
 
 def analyser_et_enregistrer(situation) -> dict:
-    """
-    Analyse une situation avec AdmiGuide AI
-    puis enregistre le résultat utile dans Django.
-    """
-
-    # Django transmet à l'IA toutes les démarches autorisées.
+    """Analyse une situation avec AdmiGuide AI et enregistre son résultat."""
     demarche_codes = list(
-        DemarcheAdministrative.objects.values_list(
-            "code",
-            flat=True,
-        )
+        DemarcheAdministrative.objects.filter(
+            code__in=MVP_DEMARCHE_CODES
+        ).values_list("code", flat=True)
     )
 
-    if not demarche_codes:
+    codes_manquants = MVP_DEMARCHE_CODES.difference(demarche_codes)
+    if codes_manquants:
         raise OrientationServiceError(
-            "Aucune démarche n'est disponible dans le référentiel."
+            "Le référentiel MVP est incomplet : "
+            + ", ".join(sorted(codes_manquants))
         )
 
-    # Récupère les éventuelles réponses déjà données.
-    reponses = _get_reponses(situation)
-
-    # Appelle le microservice AdmiGuide AI.
     resultat = analyser_situation(
         situation=situation.description_initiale,
         pays_application=situation.pays_application,
         demarche_codes=demarche_codes,
-        reponses=reponses,
+        reponses=_get_reponses(situation),
     )
 
     statut = resultat.get("statut")
 
-    # L'IA a besoin d'informations supplémentaires.
     if statut == "PRECISIONS_REQUISES":
         _enregistrer_questions(
             situation,
@@ -130,19 +142,15 @@ def analyser_et_enregistrer(situation) -> dict:
         )
         return resultat
 
-    # L'IA a identifié la démarche.
     if statut == "ORIENTATION":
-        _enregistrer_orientation(
-            situation,
-            resultat,
-        )
+        _enregistrer_orientation(situation, resultat)
         return resultat
 
-    # Les sources ne permettent pas une réponse fiable.
     if statut == "SOURCES_INSUFFISANTES":
+        # Évite de laisser d'anciennes questions inutiles à l'écran.
+        situation.questions.filter(reponse__isnull=True).delete()
         return resultat
 
-    # Sécurité si FastAPI retourne un statut inattendu.
     raise OrientationServiceError(
         "AdmiGuide AI a retourné un statut inconnu."
     )

@@ -68,7 +68,7 @@ class SituationCreateView(generics.CreateAPIView):
     permission_classes = [AllowAny]
 
     def create(self, request, *args, **kwargs):
-        """Enregistre la situation puis lance automatiquement son analyse."""
+        """Enregistre la situation uniquement si l'analyse aboutit."""
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -79,10 +79,16 @@ class SituationCreateView(generics.CreateAPIView):
         else:
             situation = serializer.save()
 
-        # Lance l'analyse avec AdmiGuide AI.
-        analyse = lancer_analyse(situation)
+        try:
+            # Lance l'analyse avec AdmiGuide AI.
+            analyse = lancer_analyse(situation)
 
-        # Retourne la situation ainsi que le premier résultat de l'analyse.
+        except Exception:
+            # Ne conserve pas une situation dont l'analyse a échoué.
+            situation.delete()
+            raise
+
+        # Retourne la situation ainsi que le résultat de l'analyse.
         donnees = dict(serializer.data)
         donnees["analyse"] = analyse
 
@@ -136,24 +142,50 @@ class SituationResultView(generics.RetrieveAPIView):
 
 
 class SituationUpdateView(generics.UpdateAPIView):
-    """Permet de modifier la description initiale d'une situation."""
+    """Modifie une situation puis relance son analyse."""
 
     queryset = SituationAdministrative.objects.all()
     serializer_class = SituationUpdateSerializer
     permission_classes = [AllowAny]
-
-    # Seule la méthode PATCH est nécessaire pour cette fonctionnalité.
     http_method_names = ["patch", "options"]
-
-    # L'UUID public est utilisé à la place de l'id numérique.
     lookup_field = "public_id"
 
     def get_object(self):
         """Retourne uniquement une situation que le demandeur peut modifier."""
-
         return get_accessible_situation(
             self.request,
             self.kwargs["public_id"],
+        )
+
+    def patch(self, request, *args, **kwargs):
+        """Enregistre la nouvelle description et produit un résultat à jour."""
+        situation = self.get_object()
+        serializer = self.get_serializer(
+            situation,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            serializer.save()
+
+            # Une nouvelle description invalide les anciennes réponses et le suivi.
+            situation.questions.all().delete()
+
+            try:
+                situation.orientation.delete()
+            except OrientationAdministrative.DoesNotExist:
+                pass
+
+        analyse = lancer_analyse(situation)
+
+        return Response(
+            {
+                **serializer.data,
+                "analyse": analyse,
+            },
+            status=status.HTTP_200_OK,
         )
 
 
