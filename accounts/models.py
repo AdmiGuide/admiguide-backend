@@ -93,7 +93,10 @@ class User(AbstractUser):
     USERNAME_FIELD = "email"
 
     # Champ supplémentaire demandé par createsuperuser.
-    REQUIRED_FIELDS = ["nom_complet"]
+    REQUIRED_FIELDS = [
+        "nom_complet",
+        "pays_residence",
+        ]
 
     # Utilise notre gestionnaire personnalisé.
     objects = UserManager()

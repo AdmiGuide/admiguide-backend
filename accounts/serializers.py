@@ -43,20 +43,90 @@ class RegisterSerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     """Sérialise les informations du profil de l'utilisateur connecté."""
 
+    role = serializers.SerializerMethodField()
+
     class Meta:
         model = User
+
         fields = [
             "id",
             "nom_complet",
             "email",
             "pays_residence",
+            "role",
         ]
 
-        # L'identifiant et l'email ne peuvent pas être modifiés directement depuis le profil
-        read_only_fields = ["id", "email"]
+        # Ces champs ne sont pas modifiables depuis le profil.
+        read_only_fields = [
+            "id",
+            "email",
+            "role",
+        ]
+
+    def get_role(self, obj):
+        """Retourne un rôle simple à utiliser côté frontend."""
+
+        return "admin" if obj.is_staff else "user"
 
 
+class AdminUserSerializer(serializers.ModelSerializer):
+    """Sérialise un compte pour l'espace administrateur."""
 
+    role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+
+        fields = [
+            "id",
+            "nom_complet",
+            "email",
+            "pays_residence",
+            "role",
+            "is_active",
+        ]
+
+        read_only_fields = fields
+
+    def get_role(self, obj):
+        """Retourne le rôle affiché dans l'administration."""
+        return "admin" if obj.is_staff else "user"
+
+
+class AdminUserDetailSerializer(serializers.ModelSerializer):
+    """Sérialise le détail d'un compte pour l'administration."""
+
+    role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+
+        fields = [
+            "id",
+            "nom_complet",
+            "email",
+            "pays_residence",
+            "role",
+            "is_active",
+            "date_joined",
+        ]
+
+        # Seul le statut du compte peut être modifié ici.
+        read_only_fields = [
+            "id",
+            "nom_complet",
+            "email",
+            "pays_residence",
+            "role",
+            "date_joined",
+        ]
+
+    def get_role(self, obj):
+        """Retourne le rôle affiché dans l'administration."""
+        return "admin" if obj.is_staff else "user"
+
+
+    
 class LogoutSerializer(serializers.Serializer):
     """Valide le refresh token envoyé lors de la déconnexion."""
 

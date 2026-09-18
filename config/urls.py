@@ -28,8 +28,11 @@ urlpatterns = [
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
 
     # Interface Swagger permettant de consulter et tester les endpoints.
-    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui",),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
 
     # Routes liées au parcours d'orientation administrative.
     path("api/orientations/", include("orientations.urls")),
+
+    # Routes du référentiel et des sources administratives.
+    path("api/referentiel/", include("referentiel.urls")),
 ]

@@ -4,7 +4,13 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
-from .views import LogoutView, ProfileView, RegisterView
+from .views import (
+    AdminUserListView,
+    LogoutView,
+    ProfileView,
+    RegisterView,
+    AdminUserDetailView
+)
 
 
 urlpatterns = [
@@ -22,4 +28,11 @@ urlpatterns = [
 
     # Consultation et modification du profil de l'utilisateur connecté.
     path("profile/", ProfileView.as_view(), name="profile"),
+
+    # Liste des comptes réservée à l'administration.
+    path("admin/users/", AdminUserListView.as_view(), name="admin-user-list"),
+
+    # Consultation et gestion d'un compte par l'administrateur.
+    path("admin/users/<int:pk>/", AdminUserDetailView.as_view(), name="admin-user-detail",),
+
 ]

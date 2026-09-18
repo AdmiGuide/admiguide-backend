@@ -434,7 +434,7 @@ class SuiviEtapeUpdateView(generics.GenericAPIView):
 
 def get_accessible_situation(request, public_id):
     """
-    Retourne une situation si le demandeur est autorisé à y accéder.
+    Retourne une situation si le demandeur est autorisé à y accéder.    
 
     Une situation anonyme est accessible avec son UUID public.
     Une situation liée à un compte est réservée à son propriétaire.

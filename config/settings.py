@@ -186,7 +186,7 @@ REST_FRAMEWORK = {
 # Définit la durée de vie des tokens JWT et sécurise leur renouvellement
 # en invalidant les anciens refresh tokens.
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
