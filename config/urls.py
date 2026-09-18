@@ -24,9 +24,6 @@ urlpatterns = [
     # Routes liées à l'authentification et aux comptes utilisateurs.
     path("api/auth/", include("accounts.urls")),
 
-    # Génère le schéma OpenAPI utilisé par la documentation.
-    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
-
     # Interface Swagger permettant de consulter et tester les endpoints.
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
 
@@ -35,4 +32,10 @@ urlpatterns = [
 
     # Routes du référentiel et des sources administratives.
     path("api/referentiel/", include("referentiel.urls")),
+
+    # Routes liées aux signalements des usagers.
+    path("api/signalements/", include("signalements.urls")),
+
+    # Génère le schéma OpenAPI utilisé par la documentation.
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
 ]

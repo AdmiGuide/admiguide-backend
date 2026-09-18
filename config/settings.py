@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "accounts",
     "orientations",
     "referentiel",
+    "signalements",
     # Autorise les appels venant du frontend Angular.
     "corsheaders",
 ]
