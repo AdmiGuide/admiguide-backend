@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAdminUser
 from config.pagination import StandardPagination
 
 from .models import SourceAdministrative
-from .serializers import AdminSourceSerializer
+from .serializers import AdminSourceSerializer, AdminSourceControlSerializer
 
 
 class AdminSourceListView(generics.ListAPIView):
@@ -37,3 +37,14 @@ class AdminSourceListView(generics.ListAPIView):
             queryset = queryset.filter(type=type_source)
 
         return queryset
+
+
+class AdminSourceControlView(generics.UpdateAPIView):
+    """Enregistre le contrôle manuel d'une source."""
+
+    queryset = SourceAdministrative.objects.all()
+    serializer_class = AdminSourceControlSerializer
+    permission_classes = [IsAdminUser]
+
+    # Cette route sert uniquement à une mise à jour partielle.
+    http_method_names = ["patch"]
