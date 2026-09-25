@@ -75,7 +75,10 @@ class SituationCreateView(generics.CreateAPIView):
 
         # Associe la situation au compte si l'utilisateur est connecté.
         if request.user.is_authenticated:
-            situation = serializer.save(utilisateur=request.user)
+            situation = serializer.save(
+                utilisateur=request.user,
+                pays_residence=request.user.pays_residence,
+            )
         else:
             situation = serializer.save()
 
@@ -96,7 +99,6 @@ class SituationCreateView(generics.CreateAPIView):
             donnees,
             status=status.HTTP_201_CREATED,
         )
-
 
 
 class SituationResultView(generics.RetrieveAPIView):
@@ -252,7 +254,7 @@ class ReponseComplementaireView(generics.GenericAPIView):
     permission_classes = [AllowAny]
 
     def post(self, request, public_id):
-        """Valide toutes les réponses avant de les enregistrer."""
+        """Valide et enregistre les précisions fournies."""
 
         # Vérifie que le demandeur peut accéder à cette situation.
         situation = get_accessible_situation(
@@ -260,26 +262,56 @@ class ReponseComplementaireView(generics.GenericAPIView):
             public_id,
         )
 
-        # Valide la structure générale du JSON reçu.
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        # Valide les données reçues.
+        serializer = self.get_serializer(
+            data=request.data
+        )
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        # Pour un utilisateur connecté,
+        # le pays vient du profil.
+        if request.user.is_authenticated:
+            pays_residence = (
+                request.user.pays_residence
+            )
+
+        # Pour un visiteur,
+        # le pays vient du formulaire des précisions.
+        else:
+            pays_residence = (
+                serializer.validated_data[
+                    "pays_residence"
+                ]
+            )
 
         reponses_a_enregistrer = []
 
-        # Vérifie d'abord toutes les réponses sans modifier la base.
-        for donnee in serializer.validated_data["reponses"]:
+        # Vérifie toutes les réponses
+        # avant de modifier la base.
+        for donnee in serializer.validated_data[
+            "reponses"
+        ]:
 
             try:
-                # Vérifie que la question appartient bien à la situation.
-                question = QuestionComplementaire.objects.get(
-                    id=donnee["question_id"],
-                    situation=situation,
+
+                # Vérifie que la question appartient
+                # bien à cette situation.
+                question = (
+                    QuestionComplementaire.objects.get(
+                        id=donnee["question_id"],
+                        situation=situation,
+                    )
                 )
+
             except QuestionComplementaire.DoesNotExist:
+
                 return Response(
                     {
                         "detail": (
-                            f"La question {donnee['question_id']} "
+                            f"La question "
+                            f"{donnee['question_id']} "
                             "n'appartient pas à cette situation."
                         )
                     },
@@ -288,53 +320,103 @@ class ReponseComplementaireView(generics.GenericAPIView):
 
             contenu = donnee["contenu"]
 
-            # Vérifie les réponses aux questions à choix unique.
+            # Vérifie une réponse à choix unique.
             if (
-                question.type_question == TypeQuestion.CHOIX_UNIQUE
+                question.type_question
+                == TypeQuestion.CHOIX_UNIQUE
                 and contenu not in question.options
             ):
+
                 return Response(
                     {
                         "detail": (
-                            f"Réponse invalide pour la question "
-                            f"{question.id}."
+                            "Réponse invalide pour "
+                            f"la question {question.id}."
                         )
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Prépare la réponse sans encore l'enregistrer.
             reponses_a_enregistrer.append(
                 (question, contenu)
             )
 
         reponses_enregistrees = []
 
-        # Toutes les réponses sont valides :
-        # elles sont maintenant enregistrées ensemble.
+        # Enregistre le pays et les réponses
+        # dans une seule transaction.
         with transaction.atomic():
+            # Conserve le pays utilisé pour cette orientation.
+            situation.pays_residence = (
+                pays_residence
+            )
 
-            for question, contenu in reponses_a_enregistrer:
+            situation.save(
+                update_fields=[
+                    "pays_residence"
+                ]
+            )
 
-                reponse, _ = ReponseComplementaire.objects.update_or_create(
-                    question=question,
-                    defaults={"contenu": contenu},
+            for (
+                question,
+                contenu,
+            ) in reponses_a_enregistrer:
+
+                reponse, _ = (
+                    ReponseComplementaire.objects
+                    .update_or_create(
+                        question=question,
+                        defaults={
+                            "contenu": contenu
+                        },
+                    )
                 )
 
                 reponses_enregistrees.append(
                     {
-                        "question_id": question.id,
-                        "contenu": reponse.contenu,
+                        "question_id":
+                            question.id,
+                        "contenu":
+                            reponse.contenu,
                     }
                 )
-        # Relance l'analyse avec les nouvelles réponses enregistrées.
-        analyse = lancer_analyse(situation)
+
+        # Si l'orientation existait déjà
+        # et qu'il n'y avait aucune question IA,
+        # on ne relance pas inutilement l'analyse.
+        if (
+            not reponses_a_enregistrer
+            and OrientationAdministrative.objects.filter(
+                situation=situation
+            ).exists()
+        ):
+
+            return Response(
+                {
+                    "detail":
+                        "Pays de résidence enregistré.",
+                    "reponses": [],
+                    "analyse": {
+                        "statut": "ORIENTATION",
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # Sinon, les nouvelles réponses peuvent
+        # modifier le résultat de l'analyse.
+        analyse = lancer_analyse(
+            situation
+        )
 
         return Response(
             {
-                "detail": "Réponses enregistrées.",
-                "reponses": reponses_enregistrees,
-                "analyse": analyse,
+                "detail":
+                    "Réponses enregistrées.",
+                "reponses":
+                    reponses_enregistrees,
+                "analyse":
+                    analyse,
             },
             status=status.HTTP_200_OK,
         )

@@ -10,6 +10,7 @@ def analyser_situation(
     situation: str,
     demarche_codes: list[str],
     pays_application: str | None = None,
+    pays_residence: str | None = None,
     reponses: list[dict] | None = None,
 ) -> dict:
     """
@@ -21,6 +22,7 @@ def analyser_situation(
     payload = {
         "situation": situation,
         "pays_application": pays_application,
+        "pays_residence": pays_residence,
         "demarche_codes": demarche_codes,
         "reponses": reponses or [],
     }
@@ -30,7 +32,7 @@ def analyser_situation(
         response = requests.post(
             f"{settings.AI_SERVICE_URL}/analyze",
             json=payload,
-            timeout=30,
+            timeout=75,
         )
 
         # Déclenche une erreur si FastAPI renvoie 4xx ou 5xx.

@@ -18,6 +18,7 @@ class SituationCreateSerializer(serializers.ModelSerializer):
             "id",
             "public_id",
             "description_initiale",
+            "pays_residence",
             "pays_application",
             "date_creation",
         ]
@@ -27,7 +28,6 @@ class SituationCreateSerializer(serializers.ModelSerializer):
 class SituationResultSerializer(serializers.ModelSerializer):
     """Sérialise le résultat complet de l'orientation."""
 
-    pays_residence = serializers.SerializerMethodField()
     orientation_disponible = serializers.SerializerMethodField()
     demarche = serializers.SerializerMethodField()
     resume = serializers.SerializerMethodField()
@@ -69,12 +69,6 @@ class SituationResultSerializer(serializers.ModelSerializer):
         orientation = self._get_orientation(obj)
         if orientation and orientation.demarche:
             return orientation.demarche
-        return None
-
-    def get_pays_residence(self, obj):
-        """Retourne le pays de résidence du compte, lorsqu'il existe."""
-        if obj.utilisateur:
-            return obj.utilisateur.pays_residence
         return None
 
     def get_orientation_disponible(self, obj):
@@ -273,11 +267,17 @@ class ReponseComplementaireInputSerializer(serializers.Serializer):
 
 
 class ReponsesComplementairesSerializer(serializers.Serializer):
-    """Valide l'ensemble des réponses envoyées pour une situation."""
+    """Valide les précisions fournies pour une situation."""
+
+    pays_residence = serializers.CharField(
+        max_length=100,
+        allow_blank=False,
+        trim_whitespace=True,
+    )
 
     reponses = ReponseComplementaireInputSerializer(
         many=True,
-        allow_empty=False,
+        allow_empty=True,
     )
 
 
