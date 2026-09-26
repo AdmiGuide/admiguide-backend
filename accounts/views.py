@@ -32,7 +32,6 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
 
 
-
 class LogoutView(generics.GenericAPIView):
     """Déconnecte l'utilisateur en invalidant son refresh token."""
 
