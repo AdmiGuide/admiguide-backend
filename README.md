@@ -1,36 +1,41 @@
 # AdmiGuide Backend
 
-Backend principal de **AdmiGuide**, une application web intelligente d'orientation administrative destinée à accompagner les usagers dans l'identification et la compréhension des démarches administratives sénégalaises.
+Backend principal de **AdmiGuide**, une application web intelligente d’orientation administrative destinée à accompagner les usagers dans l’identification et la compréhension de démarches administratives sénégalaises.
 
-Ce projet assure la gestion des utilisateurs, des situations administratives, du référentiel des démarches et la communication avec le microservice d'intelligence artificielle `admiguide-ai`.
+Ce service gère les utilisateurs, les situations administratives, le référentiel des démarches, les signalements, le suivi des étapes et la communication avec le microservice d’intelligence artificielle `admiguide-ai`.
 
 ## Fonctionnalités principales
 
-- Inscription et authentification des utilisateurs avec JWT
+- Inscription et authentification avec JWT
 - Gestion du profil utilisateur
-- Création et modification d'une situation administrative
+- Création et modification d’une situation administrative
+- Gestion du pays de résidence utilisé pour l’orientation
 - Gestion des questions et réponses complémentaires
-- Communication avec le service IA AdmiGuide
-- Enregistrement des orientations proposées
-- Consultation du résultat d'une orientation
-- Gestion de l'historique des situations
-- Gestion du référentiel des démarches administratives
-- Gestion des pièces requises, services compétents et sources officielles
+- Communication avec le microservice FastAPI
+- Enregistrement de l’orientation proposée
+- Consultation du résultat d’une orientation
+- Historique des situations pour les utilisateurs connectés
+- Suivi de la progression des étapes d’une démarche
+- Gestion des démarches, pièces requises, services et sources officielles
+- Filtrage des sources affichées selon le pays concerné
+- Création et traitement des signalements
+- Administration des utilisateurs, des sources et des signalements
 
 ## Technologies utilisées
 
 - Python
-- Django
+- Django 6
 - Django REST Framework
 - MySQL
 - Simple JWT
 - drf-spectacular
+- django-cors-headers
 - Requests
 - python-dotenv
 
 ## Architecture
 
-Le backend Django joue le rôle d'API métier principale entre le frontend Angular, la base de données MySQL et le microservice IA.
+Le backend Django constitue l’API métier principale entre le frontend Angular, la base de données MySQL et le microservice IA.
 
 ```text
 Frontend Angular
@@ -41,15 +46,13 @@ Django REST Framework
        +------> MySQL
        |
        v
-AdmiGuide AI - FastAPI
-       |
-       v
-RAG + LLM
+AdmiGuide AI
+FastAPI + RAG + LLM
 ```
 
-Le service IA peut retourner trois types de résultats :
+Le service IA peut retourner trois états :
 
-- `ORIENTATION` : une démarche administrative a été identifiée ;
+- `ORIENTATION` : une démarche a été identifiée ;
 - `PRECISIONS_REQUISES` : des informations complémentaires sont nécessaires ;
 - `SOURCES_INSUFFISANTES` : les sources disponibles ne permettent pas de fournir une orientation fiable.
 
@@ -58,9 +61,10 @@ Le service IA peut retourner trois types de résultats :
 ```text
 admiguide-backend/
 |
-|-- accounts/          # Authentification et profils utilisateurs
-|-- orientations/      # Situations, questions, réponses et orientations
-|-- referentiel/       # Démarches, pièces, services et sources
+|-- accounts/          # Authentification, profils et gestion des utilisateurs
+|-- orientations/      # Situations, questions, réponses, orientations et suivi
+|-- referentiel/       # Démarches, étapes, pièces, services et sources
+|-- signalements/      # Signalements des usagers et traitement administratif
 |-- config/            # Configuration Django
 |-- manage.py
 |-- requirements.txt
@@ -119,29 +123,31 @@ CORS_ALLOWED_ORIGINS=http://localhost:4200
 AI_SERVICE_URL=http://127.0.0.1:8001
 ```
 
-Adapter les informations MySQL selon la configuration locale.
+Adapter les paramètres MySQL selon la configuration locale.
 
 ## Base de données
 
-Créer la base de données MySQL puis appliquer les migrations :
+Appliquer les migrations :
 
 ```bash
 python manage.py migrate
 ```
 
-Initialiser les données du référentiel nécessaires au MVP :
+Initialiser le référentiel utilisé par le MVP :
 
 ```bash
 python manage.py seed_mvp_referentiel
 ```
 
-## Lancement du serveur
+## Lancement
+
+Démarrer Django :
 
 ```bash
 python manage.py runserver 8000
 ```
 
-L'API Django est alors disponible à l'adresse :
+L’API est disponible sur :
 
 ```text
 http://127.0.0.1:8000/
@@ -153,19 +159,34 @@ Le microservice `admiguide-ai` doit également être démarré sur :
 http://127.0.0.1:8001/
 ```
 
+## Documentation API
+
+Swagger est disponible sur :
+
+```text
+http://127.0.0.1:8000/api/docs/
+```
+
+Le schéma OpenAPI est disponible sur :
+
+```text
+http://127.0.0.1:8000/api/schema/
+```
+
 ## Principaux endpoints
 
 ### Authentification
 
 ```text
-POST /api/auth/register/
-POST /api/auth/login/
-POST /api/auth/logout/
-GET  /api/auth/profile/
+POST  /api/auth/register/
+POST  /api/auth/login/
+POST  /api/auth/refresh/
+POST  /api/auth/logout/
+GET   /api/auth/profile/
 PATCH /api/auth/profile/
 ```
 
-### Orientation administrative
+### Orientation
 
 ```text
 POST  /api/orientations/situations/
@@ -174,26 +195,60 @@ GET   /api/orientations/situations/{public_id}/questions/
 POST  /api/orientations/situations/{public_id}/reponses/
 GET   /api/orientations/situations/{public_id}/resultat/
 GET   /api/orientations/historique/
+PATCH /api/orientations/situations/{public_id}/etapes/{etape_id}/
+```
+
+### Administration
+
+```text
+GET   /api/auth/admin/users/
+GET   /api/auth/admin/users/{id}/
+PATCH /api/auth/admin/users/{id}/
+
+GET   /api/referentiel/admin/sources/
+PATCH /api/referentiel/admin/sources/{id}/control/
+
+GET   /api/signalements/admin/
+GET   /api/signalements/admin/{id}/
+PATCH /api/signalements/admin/{id}/
+```
+
+### Signalements
+
+```text
+POST /api/signalements/situations/{public_id}/
 ```
 
 ## Scénarios couverts par le MVP
 
-Le référentiel actuel prend en charge les situations suivantes :
+AdmiGuide prend actuellement en charge quatre situations :
 
-- remplacement d'un passeport sénégalais perdu ;
+- remplacement d’un passeport sénégalais perdu ;
 - retour définitif au Sénégal avec des effets personnels ;
-- transcription d'une naissance survenue à l'étranger ;
-- réversion de pension et capital-décès d'un fonctionnaire décédé en activité.
+- transcription d’une naissance survenue à l’étranger ;
+- réversion de pension et capital-décès d’un fonctionnaire décédé en activité.
+
+## Gestion des sources
+
+Les sources officielles sont associées aux démarches administratives et disposent d’un statut :
+
+```text
+DISPONIBLE
+INDISPONIBLE
+A_VERIFIER
+```
+
+Lorsque plusieurs sources existent pour une même démarche, AdmiGuide filtre les sources affichées afin de ne présenter que celles correspondant au contexte géographique de la situation lorsque cette information est disponible.
 
 ## Projet associé
 
-Le traitement intelligent des situations administratives est assuré par le microservice :
+L’analyse intelligente des situations est assurée par :
 
 ```text
 admiguide-ai
 ```
 
-Il utilise FastAPI ainsi qu'une architecture RAG pour analyser les situations à partir de sources administratives officielles.
+Ce microservice FastAPI utilise une architecture RAG à partir de sources administratives officielles.
 
 ## Développeuse
 
