@@ -114,17 +114,26 @@ class Command(BaseCommand):
             ]
         )
 
-    def _ajouter_source(self, demarche, titre, url):
+    def _ajouter_source(
+        self,
+        demarche,
+        titre,
+        url,
+        pays_application=None,
+    ):
         """Crée ou actualise une source officielle puis la relie."""
+
         source, _ = SourceAdministrative.objects.update_or_create(
             url=url,
             defaults={
                 "titre": titre,
                 "type": TypeSource.PAGE_WEB,
                 "statut": StatutSource.DISPONIBLE,
+                "pays_application": pays_application,
                 "date_consultation": timezone.now(),
             },
         )
+
         source.demarches.add(demarche)
 
     def _reinitialiser_relations(self, demarche, services):
@@ -172,16 +181,21 @@ class Command(BaseCommand):
             demarche,
             "Passeport ordinaire - Ministère de l'Intérieur",
             "https://www.interieur.gouv.sn/services/services-aux-usagers/passeport-ordinaire",
+            pays_application="SN",
         )
+        
         self._ajouter_source(
             demarche,
             "Renouvellement de passeport - Consulat général du Sénégal à Paris",
             "https://consulsen-paris.gouv.sn/renouvellement-de-passeport/",
+            pays_application="FR",
         )
+
         self._ajouter_source(
             demarche,
             "Renouvellement de passeport - Consulat général du Sénégal à Lyon",
             "https://consulsen-lyon.gouv.sn/renouvellement-de-passeport/",
+            pays_application="FR",
         )
 
     def _configurer_retour_definitif(self, service):
