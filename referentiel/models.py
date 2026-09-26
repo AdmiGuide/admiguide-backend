@@ -212,6 +212,15 @@ class SourceAdministrative(models.Model):
         verbose_name="type de source",
     )
 
+    # Pays dans lequel cette source s'applique.
+    # Exemples : SN, FR ou ETRANGER.
+    pays_application = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        verbose_name="pays d'application",
+    )
+
     statut = models.CharField(
     max_length=20,
     choices=StatutSource.choices,

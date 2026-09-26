@@ -1,5 +1,5 @@
 from rest_framework import serializers
-
+from django.db.models import Q
 from .models import (
     OrientationAdministrative,
     QuestionComplementaire,
@@ -178,14 +178,45 @@ class SituationResultSerializer(serializers.ModelSerializer):
         ]
 
     def get_sources(self, obj):
-        """Retourne uniquement les sources actuellement disponibles."""
+        """Retourne les sources disponibles adaptées au pays de résidence."""
+
         demarche = self._get_demarche(obj)
+
         if not demarche:
             return []
 
         sources = demarche.sources.filter(
             statut=StatutSource.DISPONIBLE
-        ).order_by("titre")
+        )
+
+        # Convertit les pays utilisés dans l'interface
+        # vers les codes enregistrés sur les sources.
+        pays_codes = {
+            "sénégal": "SN",
+            "senegal": "SN",
+            "france": "FR",
+        }
+
+        pays_residence = (
+            obj.pays_residence or ""
+        ).strip().lower()
+
+        code_pays = pays_codes.get(
+            pays_residence
+        )
+
+        if code_pays:
+            sources = sources.filter(
+                Q(pays_application=code_pays)
+                | Q(pays_application__isnull=True)
+            )
+        else:
+            # Une source sans pays reste une source générale.
+            sources = sources.filter(
+                pays_application__isnull=True
+            )
+
+        sources = sources.order_by("titre")
 
         return [
             {
