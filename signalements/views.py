@@ -1,9 +1,7 @@
-from django.db import transaction
-
 from rest_framework import generics, status
 from rest_framework.exceptions import NotFound
 from rest_framework.filters import SearchFilter
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 
 from config.pagination import StandardPagination
@@ -24,7 +22,7 @@ class SignalementCreateView(generics.CreateAPIView):
     """Permet à un usager de signaler un problème sur une orientation."""
 
     serializer_class = SignalementCreateSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def _get_orientation(self):
         """Retourne l'orientation si la situation est accessible."""
@@ -49,16 +47,11 @@ class SignalementCreateView(generics.CreateAPIView):
             raise NotFound("Orientation introuvable.")
 
     def perform_create(self, serializer):
-        """Associe le signalement à l'orientation et à son auteur éventuel."""
-        utilisateur = (
-            self.request.user
-            if self.request.user.is_authenticated
-            else None
-        )
+        """Associe le signalement à l'orientation et à son auteur."""
 
         serializer.save(
             orientation=self._get_orientation(),
-            utilisateur=utilisateur,
+            utilisateur=self.request.user,
         )
 
 
@@ -87,8 +80,6 @@ class AdminSignalementListView(generics.ListAPIView):
                 "orientation__situation",
                 "orientation__demarche",
                 "utilisateur",
-                "traitement",
-                "traitement__administrateur",
             )
             .order_by("-date_creation")
         )
@@ -121,8 +112,6 @@ class AdminSignalementDetailView(generics.RetrieveUpdateAPIView):
             "orientation__situation",
             "orientation__demarche",
             "utilisateur",
-            "traitement",
-            "traitement__administrateur",
         )
     )
 
@@ -133,7 +122,6 @@ class AdminSignalementDetailView(generics.RetrieveUpdateAPIView):
 
         return AdminSignalementSerializer
 
-    @transaction.atomic
     def patch(self, request, *args, **kwargs):
         """Met à jour puis retourne le signalement complet."""
         signalement = self.get_object()
@@ -146,7 +134,7 @@ class AdminSignalementDetailView(generics.RetrieveUpdateAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
-        # Recharge les relations, notamment le traitement nouvellement créé.
+        # Recharge le signalement après la mise à jour.
         signalement.refresh_from_db()
 
         response_serializer = AdminSignalementSerializer(

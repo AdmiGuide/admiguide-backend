@@ -22,7 +22,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             "id",
             "nom_complet",
             "email",
-            "pays_residence",
             "password",
         ]
 
@@ -52,7 +51,6 @@ class ProfileSerializer(serializers.ModelSerializer):
             "id",
             "nom_complet",
             "email",
-            "pays_residence",
             "role",
         ]
 
@@ -81,7 +79,6 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "id",
             "nom_complet",
             "email",
-            "pays_residence",
             "role",
             "is_active",
         ]
@@ -105,7 +102,6 @@ class AdminUserDetailSerializer(serializers.ModelSerializer):
             "id",
             "nom_complet",
             "email",
-            "pays_residence",
             "role",
             "is_active",
             "date_joined",
@@ -116,7 +112,6 @@ class AdminUserDetailSerializer(serializers.ModelSerializer):
             "id",
             "nom_complet",
             "email",
-            "pays_residence",
             "role",
             "date_joined",
         ]

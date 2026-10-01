@@ -1,7 +1,6 @@
-from django.test import TestCase
-
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -27,14 +26,12 @@ class SuiviEtapeAPITest(APITestCase):
             email="dado@test.com",
             password="Test1234!",
             nom_complet="Dado Test",
-            pays_residence="Sénégal",
         )
 
         self.autre_user = User.objects.create_user(
             email="autre@test.com",
             password="Test1234!",
             nom_complet="Autre Utilisateur",
-            pays_residence="Sénégal",
         )
 
         # Démarche principale.
@@ -59,7 +56,6 @@ class SuiviEtapeAPITest(APITestCase):
         self.situation = SituationAdministrative.objects.create(
             utilisateur=self.user,
             description_initiale="Situation administrative de test.",
-            pays_application="SN",
         )
 
         self.orientation = OrientationAdministrative.objects.create(

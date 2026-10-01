@@ -77,7 +77,6 @@ class SituationCreateView(generics.CreateAPIView):
         if request.user.is_authenticated:
             situation = serializer.save(
                 utilisateur=request.user,
-                pays_residence=request.user.pays_residence,
             )
         else:
             situation = serializer.save()
@@ -270,22 +269,6 @@ class ReponseComplementaireView(generics.GenericAPIView):
             raise_exception=True
         )
 
-        # Pour un utilisateur connecté,
-        # le pays vient du profil.
-        if request.user.is_authenticated:
-            pays_residence = (
-                request.user.pays_residence
-            )
-
-        # Pour un visiteur,
-        # le pays vient du formulaire des précisions.
-        else:
-            pays_residence = (
-                serializer.validated_data[
-                    "pays_residence"
-                ]
-            )
-
         reponses_a_enregistrer = []
 
         # Vérifie toutes les réponses
@@ -295,7 +278,6 @@ class ReponseComplementaireView(generics.GenericAPIView):
         ]:
 
             try:
-
                 # Vérifie que la question appartient
                 # bien à cette situation.
                 question = (
@@ -306,7 +288,6 @@ class ReponseComplementaireView(generics.GenericAPIView):
                 )
 
             except QuestionComplementaire.DoesNotExist:
-
                 return Response(
                     {
                         "detail": (
@@ -326,7 +307,6 @@ class ReponseComplementaireView(generics.GenericAPIView):
                 == TypeQuestion.CHOIX_UNIQUE
                 and contenu not in question.options
             ):
-
                 return Response(
                     {
                         "detail": (
@@ -343,19 +323,9 @@ class ReponseComplementaireView(generics.GenericAPIView):
 
         reponses_enregistrees = []
 
-        # Enregistre le pays et les réponses
+        # Enregistre toutes les réponses
         # dans une seule transaction.
         with transaction.atomic():
-            # Conserve le pays utilisé pour cette orientation.
-            situation.pays_residence = (
-                pays_residence
-            )
-
-            situation.save(
-                update_fields=[
-                    "pays_residence"
-                ]
-            )
 
             for (
                 question,
@@ -374,49 +344,22 @@ class ReponseComplementaireView(generics.GenericAPIView):
 
                 reponses_enregistrees.append(
                     {
-                        "question_id":
-                            question.id,
-                        "contenu":
-                            reponse.contenu,
+                        "question_id": question.id,
+                        "contenu": reponse.contenu,
                     }
                 )
 
-        # Si l'orientation existait déjà
-        # et qu'il n'y avait aucune question IA,
-        # on ne relance pas inutilement l'analyse.
-        if (
-            not reponses_a_enregistrer
-            and OrientationAdministrative.objects.filter(
-                situation=situation
-            ).exists()
-        ):
-
-            return Response(
-                {
-                    "detail":
-                        "Pays de résidence enregistré.",
-                    "reponses": [],
-                    "analyse": {
-                        "statut": "ORIENTATION",
-                    },
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        # Sinon, les nouvelles réponses peuvent
-        # modifier le résultat de l'analyse.
+        # Les nouvelles réponses peuvent modifier
+        # le résultat de l'analyse.
         analyse = lancer_analyse(
             situation
         )
 
         return Response(
             {
-                "detail":
-                    "Réponses enregistrées.",
-                "reponses":
-                    reponses_enregistrees,
-                "analyse":
-                    analyse,
+                "detail": "Réponses enregistrées.",
+                "reponses": reponses_enregistrees,
+                "analyse": analyse,
             },
             status=status.HTTP_200_OK,
         )

@@ -9,8 +9,6 @@ class AIServiceError(Exception):
 def analyser_situation(
     situation: str,
     demarche_codes: list[str],
-    pays_application: str | None = None,
-    pays_residence: str | None = None,
     reponses: list[dict] | None = None,
 ) -> dict:
     """
@@ -21,8 +19,11 @@ def analyser_situation(
     # Données attendues par l'endpoint FastAPI /analyze.
     payload = {
         "situation": situation,
-        "pays_application": pays_application,
-        "pays_residence": pays_residence,
+        # La V1 d'AdmiGuide est limitée au Sénégal.
+        # Ces valeurs restent envoyées temporairement
+        # pour conserver la compatibilité avec AdmiGuide AI.
+        "pays_application": "SN",
+        "pays_residence": "Sénégal",
         "demarche_codes": demarche_codes,
         "reponses": reponses or [],
     }

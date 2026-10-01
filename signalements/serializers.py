@@ -1,9 +1,7 @@
 from rest_framework import serializers
 
-from .models import (
-    Signalement,
-    TraitementSignalement,
-)
+from .models import Signalement
+
 
 
 class SignalementCreateSerializer(serializers.ModelSerializer):
@@ -25,30 +23,6 @@ class SignalementCreateSerializer(serializers.ModelSerializer):
         ]
 
 
-class TraitementSignalementSerializer(serializers.ModelSerializer):
-    """Sérialise le traitement administratif d'un signalement."""
-
-    administrateur_nom = serializers.CharField(
-        source="administrateur.nom_complet",
-        read_only=True,
-    )
-
-    resultat_label = serializers.CharField(
-        source="get_resultat_display",
-        read_only=True,
-    )
-
-    class Meta:
-        model = TraitementSignalement
-        fields = [
-            "id",
-            "administrateur_nom",
-            "commentaire_administrateur",
-            "resultat",
-            "resultat_label",
-            "suite_a_donner",
-            "date_traitement",
-        ]
 
 
 class AdminSignalementSerializer(serializers.ModelSerializer):
@@ -79,9 +53,7 @@ class AdminSignalementSerializer(serializers.ModelSerializer):
     utilisateur_nom = serializers.SerializerMethodField()
     utilisateur_email = serializers.SerializerMethodField()
 
-    traitement = TraitementSignalementSerializer(
-        read_only=True,
-    )
+
 
     class Meta:
         model = Signalement
@@ -99,7 +71,6 @@ class AdminSignalementSerializer(serializers.ModelSerializer):
             "statut_label",
             "date_creation",
             "date_mise_a_jour",
-            "traitement",
         ]
 
     def get_demarche(self, obj):
@@ -111,19 +82,12 @@ class AdminSignalementSerializer(serializers.ModelSerializer):
         return obj.orientation.demarche.intitule
 
     def get_utilisateur_nom(self, obj):
-        """Retourne le nom de l'auteur ou Visiteur."""
-
-        if not obj.utilisateur:
-            return "Visiteur"
-
+        """Retourne le nom de l'auteur du signalement."""
         return obj.utilisateur.nom_complet
 
+
     def get_utilisateur_email(self, obj):
-        """Retourne l'e-mail lorsqu'un compte est associé."""
-
-        if not obj.utilisateur:
-            return None
-
+        """Retourne l'e-mail de l'auteur du signalement."""
         return obj.utilisateur.email
 
 

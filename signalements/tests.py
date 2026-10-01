@@ -27,21 +27,18 @@ class SignalementAPITest(APITestCase):
             email="user@test.com",
             password="Test1234!",
             nom_complet="Utilisateur Test",
-            pays_residence="Sénégal",
         )
 
         self.other_user = User.objects.create_user(
             email="other@test.com",
             password="Test1234!",
             nom_complet="Autre Utilisateur",
-            pays_residence="Sénégal",
         )
 
         self.admin = User.objects.create_superuser(
             email="admin@test.com",
             password="Test1234!",
             nom_complet="Admin Test",
-            pays_residence="Sénégal",
         )
 
         self.demarche = DemarcheAdministrative.objects.create(
@@ -53,7 +50,6 @@ class SignalementAPITest(APITestCase):
         self.situation = SituationAdministrative.objects.create(
             utilisateur=self.user,
             description_initiale="Situation privée à signaler.",
-            pays_application="SN",
         )
 
         self.orientation = OrientationAdministrative.objects.create(
@@ -63,7 +59,7 @@ class SignalementAPITest(APITestCase):
         )
 
     def test_utilisateur_peut_creer_signalement(self):
-        """Un utilisateur peut signaler sa propre orientation."""
+        """Un utilisateur authentifié peut signaler sa propre orientation."""
 
         self.client.force_authenticate(user=self.user)
 
@@ -101,24 +97,13 @@ class SignalementAPITest(APITestCase):
             StatutSignalement.NOUVEAU,
         )
 
-    def test_visiteur_peut_signaler_orientation_anonyme(self):
-        """Un visiteur peut signaler une orientation anonyme."""
-
-        situation = SituationAdministrative.objects.create(
-            description_initiale="Situation anonyme à signaler.",
-            pays_application="SN",
-        )
-
-        orientation = OrientationAdministrative.objects.create(
-            situation=situation,
-            demarche=self.demarche,
-            resume="Orientation anonyme.",
-        )
+    def test_visiteur_ne_peut_pas_creer_signalement(self):
+        """Un visiteur non authentifié ne peut pas créer de signalement."""
 
         response = self.client.post(
             reverse(
                 "signalement-create",
-                kwargs={"public_id": situation.public_id},
+                kwargs={"public_id": self.situation.public_id},
             ),
             {
                 "type_probleme": "INFORMATION_INCOMPLETE",
@@ -129,18 +114,11 @@ class SignalementAPITest(APITestCase):
 
         self.assertEqual(
             response.status_code,
-            status.HTTP_201_CREATED,
+            status.HTTP_401_UNAUTHORIZED,
         )
 
-        signalement = Signalement.objects.get(
-            orientation=orientation,
-        )
-
-        self.assertIsNone(signalement.utilisateur)
-
-        self.assertEqual(
-            signalement.statut,
-            StatutSignalement.NOUVEAU,
+        self.assertFalse(
+            Signalement.objects.exists()
         )
 
     def test_autre_utilisateur_ne_peut_pas_signaler_situation_privee(self):

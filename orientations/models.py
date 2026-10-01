@@ -33,22 +33,6 @@ class SituationAdministrative(models.Model):
         verbose_name="description initiale",
     )
 
-    # Pays dans lequel la démarche doit être effectuée.
-    # Exemples : SN, FR ou ETRANGER.
-    pays_application = models.CharField(
-        max_length=20,
-        null=True,
-        blank=True,
-        verbose_name="pays d'application",
-    )
-
-    # Pays de résidence renseigné pendant l'étape de précisions.
-    pays_residence = models.CharField(
-        max_length=100,
-        null=True,
-        blank=True,
-        verbose_name="pays de résidence",
-    )
 
     date_creation = models.DateTimeField(
         auto_now_add=True,

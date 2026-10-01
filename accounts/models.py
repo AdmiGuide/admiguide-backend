@@ -84,10 +84,6 @@ class User(AbstractUser):
         verbose_name="nom complet",
     )
 
-    pays_residence = models.CharField(
-        max_length=100,
-        verbose_name="pays de résidence",
-    )
 
     # L'email devient l'identifiant utilisé pour la connexion.
     USERNAME_FIELD = "email"
@@ -95,7 +91,6 @@ class User(AbstractUser):
     # Champ supplémentaire demandé par createsuperuser.
     REQUIRED_FIELDS = [
         "nom_complet",
-        "pays_residence",
         ]
 
     # Utilise notre gestionnaire personnalisé.

@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from django.db.models import Q
 from .models import (
     OrientationAdministrative,
     QuestionComplementaire,
@@ -18,8 +17,6 @@ class SituationCreateSerializer(serializers.ModelSerializer):
             "id",
             "public_id",
             "description_initiale",
-            "pays_residence",
-            "pays_application",
             "date_creation",
         ]
         read_only_fields = ["id", "public_id", "date_creation"]
@@ -43,8 +40,6 @@ class SituationResultSerializer(serializers.ModelSerializer):
         fields = [
             "public_id",
             "description_initiale",
-            "pays_application",
-            "pays_residence",
             "date_creation",
             "orientation_disponible",
             "demarche",
@@ -178,45 +173,18 @@ class SituationResultSerializer(serializers.ModelSerializer):
         ]
 
     def get_sources(self, obj):
-        """Retourne les sources disponibles adaptées au pays de résidence."""
+        """Retourne les sources disponibles de la démarche."""
 
         demarche = self._get_demarche(obj)
 
         if not demarche:
             return []
 
-        sources = demarche.sources.filter(
-            statut=StatutSource.DISPONIBLE
+        sources = (
+            demarche.sources
+            .filter(statut=StatutSource.DISPONIBLE)
+            .order_by("titre")
         )
-
-        # Convertit les pays utilisés dans l'interface
-        # vers les codes enregistrés sur les sources.
-        pays_codes = {
-            "sénégal": "SN",
-            "senegal": "SN",
-            "france": "FR",
-        }
-
-        pays_residence = (
-            obj.pays_residence or ""
-        ).strip().lower()
-
-        code_pays = pays_codes.get(
-            pays_residence
-        )
-
-        if code_pays:
-            sources = sources.filter(
-                Q(pays_application=code_pays)
-                | Q(pays_application__isnull=True)
-            )
-        else:
-            # Une source sans pays reste une source générale.
-            sources = sources.filter(
-                pays_application__isnull=True
-            )
-
-        sources = sources.order_by("titre")
 
         return [
             {
@@ -231,7 +199,6 @@ class SituationHistorySerializer(serializers.ModelSerializer):
     """Sérialise une situation pour l'écran « Mon historique »."""
 
     titre = serializers.SerializerMethodField()
-    pays_residence = serializers.SerializerMethodField()
     orientation_disponible = serializers.SerializerMethodField()
 
     class Meta:
@@ -239,8 +206,6 @@ class SituationHistorySerializer(serializers.ModelSerializer):
         fields = [
             "public_id",
             "titre",
-            "pays_application",
-            "pays_residence",
             "date_creation",
             "orientation_disponible",
         ]
@@ -262,11 +227,6 @@ class SituationHistorySerializer(serializers.ModelSerializer):
         texte = obj.description_initiale.strip()
         return f"{texte[:60]}..." if len(texte) > 60 else texte
 
-    def get_pays_residence(self, obj):
-        """Retourne le pays enregistré dans le profil utilisateur."""
-        if obj.utilisateur:
-            return obj.utilisateur.pays_residence
-        return None
 
     def get_orientation_disponible(self, obj):
         """Indique si la situation possède déjà une orientation."""
@@ -300,15 +260,9 @@ class ReponseComplementaireInputSerializer(serializers.Serializer):
 class ReponsesComplementairesSerializer(serializers.Serializer):
     """Valide les précisions fournies pour une situation."""
 
-    pays_residence = serializers.CharField(
-        max_length=100,
-        allow_blank=False,
-        trim_whitespace=True,
-    )
-
     reponses = ReponseComplementaireInputSerializer(
         many=True,
-        allow_empty=True,
+        allow_empty=False,
     )
 
 

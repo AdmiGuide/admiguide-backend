@@ -1,7 +1,7 @@
 from django.contrib import admin
 
-from .models import Signalement, TraitementSignalement
+from .models import Signalement
 
 
 admin.site.register(Signalement)
-admin.site.register(TraitementSignalement)
+

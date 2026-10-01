@@ -30,13 +30,6 @@ class StatutSignalement(models.TextChoices):
     TRAITE = "TRAITE", "Traité"
 
 
-class ResultatTraitement(models.TextChoices):
-    """Définit le résultat final du traitement administratif."""
-
-    RESOLU = "RESOLU", "Résolu"
-    NON_RESOLU = "NON_RESOLU", "Non résolu"
-    REJETE = "REJETE", "Rejeté"
-
 
 class Signalement(models.Model):
     """Représente un problème signalé sur une orientation."""
@@ -47,12 +40,9 @@ class Signalement(models.Model):
         related_name="signalements",
     )
 
-    # Le signalement peut être envoyé par un visiteur sans compte.
     utilisateur = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
+        on_delete=models.CASCADE,
         related_name="signalements",
     )
 
@@ -89,43 +79,3 @@ class Signalement(models.Model):
         return f"Signalement {self.id} - {self.get_statut_display()}"
 
 
-class TraitementSignalement(models.Model):
-    """Enregistre le traitement réalisé par un administrateur."""
-
-    signalement = models.OneToOneField(
-        Signalement,
-        on_delete=models.CASCADE,
-        related_name="traitement",
-    )
-
-    administrateur = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name="traitements_signalements",
-    )
-
-    commentaire_administrateur = models.TextField(
-        max_length=1500,
-        verbose_name="commentaire administrateur",
-    )
-
-    resultat = models.CharField(
-        max_length=20,
-        choices=ResultatTraitement.choices,
-        verbose_name="résultat",
-    )
-
-    suite_a_donner = models.TextField(
-        max_length=1000,
-        blank=True,
-        verbose_name="suite à donner",
-    )
-
-    date_traitement = models.DateTimeField(
-        auto_now=True,
-        verbose_name="date de traitement",
-    )
-
-    def __str__(self):
-        """Retourne le signalement traité."""
-        return f"Traitement du signalement {self.signalement_id}"

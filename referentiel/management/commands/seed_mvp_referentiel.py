@@ -119,7 +119,6 @@ class Command(BaseCommand):
         demarche,
         titre,
         url,
-        pays_application=None,
     ):
         """Crée ou actualise une source officielle puis la relie."""
 
@@ -129,7 +128,6 @@ class Command(BaseCommand):
                 "titre": titre,
                 "type": TypeSource.PAGE_WEB,
                 "statut": StatutSource.DISPONIBLE,
-                "pays_application": pays_application,
                 "date_consultation": timezone.now(),
             },
         )
@@ -181,22 +179,8 @@ class Command(BaseCommand):
             demarche,
             "Passeport ordinaire - Ministère de l'Intérieur",
             "https://www.interieur.gouv.sn/services/services-aux-usagers/passeport-ordinaire",
-            pays_application="SN",
         )
         
-        self._ajouter_source(
-            demarche,
-            "Renouvellement de passeport - Consulat général du Sénégal à Paris",
-            "https://consulsen-paris.gouv.sn/renouvellement-de-passeport/",
-            pays_application="FR",
-        )
-
-        self._ajouter_source(
-            demarche,
-            "Renouvellement de passeport - Consulat général du Sénégal à Lyon",
-            "https://consulsen-lyon.gouv.sn/renouvellement-de-passeport/",
-            pays_application="FR",
-        )
 
     def _configurer_retour_definitif(self, service):
         """Configure le retour définitif au Sénégal."""

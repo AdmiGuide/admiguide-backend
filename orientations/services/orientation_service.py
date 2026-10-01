@@ -128,8 +128,6 @@ def analyser_et_enregistrer(situation) -> dict:
 
     resultat = analyser_situation(
         situation=situation.description_initiale,
-        pays_application=situation.pays_application,
-        pays_residence=situation.pays_residence,
         demarche_codes=demarche_codes,
         reponses=_get_reponses(situation),
     )
