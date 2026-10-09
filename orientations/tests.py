@@ -282,17 +282,6 @@ class PensionsDecesOrientationTest(APITestCase):
             description="Test.",
         )
 
-        DemarcheAdministrative.objects.create(
-            code="RETOUR_EFFETS_PERSONNELS",
-            intitule="Retour effets personnels",
-            description="Test.",
-        )
-
-        DemarcheAdministrative.objects.create(
-            code="NAISSANCE_ETRANGER",
-            intitule="Naissance à l'étranger",
-            description="Test.",
-        )
 
         DemarcheAdministrative.objects.create(
             code="REGULARISATION_BAIL",
@@ -605,14 +594,6 @@ class FoncierOrientationTest(APITestCase):
             (
                 "REMPLACEMENT_PASSEPORT_PERDU",
                 "Remplacement passeport perdu",
-            ),
-            (
-                "RETOUR_EFFETS_PERSONNELS",
-                "Retour effets personnels",
-            ),
-            (
-                "NAISSANCE_ETRANGER",
-                "Naissance à l'étranger",
             ),
             (
                 "REVERSION_PENSION_CAPITAL_DECES_ACTIVITE",

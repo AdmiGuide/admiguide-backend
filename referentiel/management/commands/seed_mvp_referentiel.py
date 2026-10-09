@@ -24,10 +24,6 @@ class Command(BaseCommand):
             defaults={"sigle": ""},
         )
 
-        dgse, _ = Administration.objects.update_or_create(
-            nom="Direction générale des Sénégalais de l'Extérieur",
-            defaults={"sigle": "DGSE"},
-        )
 
         pensions, _ = Administration.objects.update_or_create(
             nom="Direction des Pensions",
@@ -41,25 +37,7 @@ class Command(BaseCommand):
 
         service_passeports, _ = ServiceAdministratif.objects.update_or_create(
             administration=interieur,
-            nom="Service des passeports ou représentation consulaire compétente",
-            defaults={
-                "adresse": "",
-                "contact": "",
-            },
-        )
-
-        service_dgse, _ = ServiceAdministratif.objects.update_or_create(
-            administration=dgse,
-            nom="Direction générale des Sénégalais de l'Extérieur",
-            defaults={
-                "adresse": "",
-                "contact": "",
-            },
-        )
-
-        service_consulaire, _ = ServiceAdministratif.objects.update_or_create(
-            administration=dgse,
-            nom="Représentation diplomatique ou consulaire du Sénégal",
+            nom="Service des passeports",
             defaults={
                 "adresse": "",
                 "contact": "",
@@ -94,8 +72,6 @@ class Command(BaseCommand):
         )
 
         self._configurer_passeport_perdu(service_passeports)
-        self._configurer_retour_definitif(service_dgse)
-        self._configurer_naissance_etranger(service_consulaire)
 
         # Remplace l'ancienne démarche unique liée au décès
         # par les deux nouvelles démarches.
@@ -340,157 +316,7 @@ class Command(BaseCommand):
             ),
         )
 
-    def _configurer_retour_definitif(
-        self,
-        service,
-    ):
-        """Configure le retour définitif au Sénégal."""
-
-        demarche = self._demarche(
-            code="RETOUR_EFFETS_PERSONNELS",
-            intitule=(
-                "Retour définitif au Sénégal avec effets personnels"
-            ),
-            description=(
-                "Orientation pour préparer un retour définitif "
-                "au Sénégal avec des effets personnels."
-            ),
-            cout="À confirmer auprès du service compétent",
-            delai="Variable selon le service compétent",
-        )
-
-        self._reinitialiser_relations(
-            demarche,
-            [service],
-        )
-
-        self._synchroniser_etapes(
-            demarche,
-            [
-                (
-                    "Vérifier les conditions du certificat "
-                    "de déménagement."
-                ),
-                (
-                    "Préparer la liste des biens et les "
-                    "justificatifs demandés."
-                ),
-                (
-                    "Demander le certificat auprès du service "
-                    "compétent."
-                ),
-                (
-                    "Conserver les documents pour les formalités "
-                    "liées au retour."
-                ),
-            ],
-        )
-
-        self._synchroniser_pieces(
-            demarche,
-            [
-                (
-                    "Liste des bagages et biens à déménager "
-                    "en deux exemplaires",
-                    True,
-                ),
-                (
-                    "Carte consulaire originale datant "
-                    "de plus de six mois",
-                    True,
-                ),
-                (
-                    "Billet ou réservation pour le retour "
-                    "définitif au Sénégal",
-                    True,
-                ),
-            ],
-        )
-
-        self._ajouter_source(
-            demarche,
-            "Certificat de déménagement - DGSE",
-            (
-                "https://dgse.gouv.sn/content/"
-                "certificat-de-d%C3%A9m%C3%A9nagement"
-            ),
-        )
-
-    def _configurer_naissance_etranger(
-        self,
-        service,
-    ):
-        """Configure la transcription d'une naissance à l'étranger."""
-
-        demarche = self._demarche(
-            code="NAISSANCE_ETRANGER",
-            intitule=(
-                "Transcription d'une naissance survenue à l'étranger"
-            ),
-            description=(
-                "Orientation pour faire transcrire au Sénégal "
-                "un acte de naissance établi à l'étranger."
-            ),
-            cout="À confirmer auprès du service compétent",
-            delai="Variable selon le service compétent",
-        )
-
-        self._reinitialiser_relations(
-            demarche,
-            [service],
-        )
-
-        self._synchroniser_etapes(
-            demarche,
-            [
-                (
-                    "Réunir l'acte de naissance étranger "
-                    "et les justificatifs demandés."
-                ),
-                (
-                    "Identifier la représentation sénégalaise "
-                    "compétente."
-                ),
-                (
-                    "Déposer la demande de transcription."
-                ),
-                (
-                    "Suivre le traitement et récupérer "
-                    "l'acte transcrit."
-                ),
-            ],
-        )
-
-        self._synchroniser_pieces(
-            demarche,
-            [
-                (
-                    "Deux copies intégrales originales de l'acte "
-                    "de naissance datant de moins de trois mois",
-                    True,
-                ),
-                (
-                    "Document d'identité sénégalais en cours "
-                    "de validité du père ou de la mère",
-                    True,
-                ),
-                (
-                    "Livret de famille dans lequel "
-                    "l'enfant est inscrit",
-                    True,
-                ),
-            ],
-        )
-
-        self._ajouter_source(
-            demarche,
-            "Transcription d'un acte d'état civil - DGSE",
-            (
-                "https://dgse.gouv.sn/content/"
-                "transcription-d%E2%80%99un-acte-"
-                "d%E2%80%99%C3%A9tat-civil"
-            ),
-        )
+    
 
     def _configurer_deces_fonctionnaire_activite(
         self,
