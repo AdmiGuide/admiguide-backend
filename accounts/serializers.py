@@ -127,3 +127,49 @@ class LogoutSerializer(serializers.Serializer):
 
     # Token nécessaire pour invalider la session de l'utilisateur.
     refresh = serializers.CharField(write_only=True)
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """Valide l'adresse e-mail utilisée pour demander une réinitialisation."""
+
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """Valide le nouveau mot de passe choisi par l'utilisateur."""
+
+    new_password = serializers.CharField(
+        write_only=True,
+    )
+
+    confirm_password = serializers.CharField(
+        write_only=True,
+    )
+
+    def validate_new_password(self, value):
+        """Applique les règles de sécurité des mots de passe Django."""
+
+        user = self.context.get("user")
+
+        validate_password(
+            value,
+            user=user,
+        )
+
+        return value
+
+    def validate(self, attrs):
+        """Vérifie que les deux mots de passe correspondent."""
+
+        if (
+            attrs["new_password"]
+            != attrs["confirm_password"]
+        ):
+            raise serializers.ValidationError(
+                {
+                    "confirm_password":
+                        "Les mots de passe ne correspondent pas."
+                }
+            )
+
+        return attrs

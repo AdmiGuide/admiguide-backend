@@ -1,6 +1,12 @@
 from django.shortcuts import render
-
+from django.conf import settings
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from rest_framework import generics, status, serializers
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
 from rest_framework.permissions import (
     AllowAny,
     IsAdminUser,
@@ -18,9 +24,12 @@ from .serializers import (
     LogoutSerializer,
     ProfileSerializer,
     RegisterSerializer,
+    PasswordResetRequestSerializer,
+    PasswordResetConfirmSerializer,
 )
 from config.pagination import StandardPagination
 from rest_framework.filters import SearchFilter
+
 
 class RegisterView(generics.CreateAPIView):
     """Permet à un visiteur de créer un compte utilisateur."""
@@ -32,6 +41,141 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
 
 
+class PasswordResetRequestView(APIView):
+    """Permet de demander un lien de réinitialisation du mot de passe."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        """Génère et envoie un lien sécurisé si le compte existe."""
+
+        serializer = PasswordResetRequestSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+
+        user = User.objects.filter(
+            email__iexact=email,
+            is_active=True,
+        ).first()
+
+        # Ne révèle pas si l'adresse e-mail existe ou non.
+        if user:
+            uid = urlsafe_base64_encode(
+                force_bytes(user.pk)
+            )
+
+            token = default_token_generator.make_token(
+                user
+            )
+
+            reset_url = (
+                f"{settings.FRONTEND_URL}/"
+                f"reinitialiser-mot-de-passe/"
+                f"{uid}/{token}"
+            )
+
+            send_mail(
+                subject="Réinitialisation de votre mot de passe AdmiGuide",
+                message=(
+                    "Vous avez demandé la réinitialisation "
+                    "de votre mot de passe.\n\n"
+                    f"Utilisez ce lien :\n{reset_url}\n\n"
+                    "Si vous n'êtes pas à l'origine de cette demande, "
+                    "ignorez cet e-mail."
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+            )
+
+        return Response(
+            {
+                "detail": (
+                    "Si un compte correspond à cette adresse e-mail, "
+                    "un lien de réinitialisation a été envoyé."
+                )
+            },
+            status=status.HTTP_200_OK,
+        )
+    
+class PasswordResetConfirmView(APIView):
+    """Permet de définir un nouveau mot de passe avec un lien valide."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request, uidb64, token):
+        """Vérifie le lien puis met à jour le mot de passe."""
+
+        try:
+            user_id = force_str(
+                urlsafe_base64_decode(uidb64)
+            )
+
+            user = User.objects.get(
+                pk=user_id,
+                is_active=True,
+            )
+
+        except (
+            TypeError,
+            ValueError,
+            OverflowError,
+            User.DoesNotExist,
+        ):
+            return Response(
+                {
+                    "detail":
+                        "Le lien de réinitialisation est invalide."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not default_token_generator.check_token(
+            user,
+            token,
+        ):
+            return Response(
+                {
+                    "detail":
+                        "Le lien de réinitialisation est invalide ou expiré."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = PasswordResetConfirmSerializer(
+            data=request.data,
+            context={
+                "user": user,
+            },
+        )
+
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        user.set_password(
+            serializer.validated_data[
+                "new_password"
+            ]
+        )
+
+        user.save(
+            update_fields=[
+                "password",
+            ]
+        )
+
+        return Response(
+            {
+                "detail":
+                    "Votre mot de passe a été réinitialisé avec succès."
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    
 class LogoutView(generics.GenericAPIView):
     """Déconnecte l'utilisateur en invalidant son refresh token."""
 

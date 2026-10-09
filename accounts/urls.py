@@ -9,7 +9,9 @@ from .views import (
     LogoutView,
     ProfileView,
     RegisterView,
-    AdminUserDetailView
+    AdminUserDetailView,
+    PasswordResetRequestView,
+    PasswordResetConfirmView,
 )
 
 
@@ -22,6 +24,13 @@ urlpatterns = [
 
     # Génère un nouvel access token à partir d'un refresh token valide.
     path("refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+
+    # Demande d'un lien de réinitialisation du mot de passe.
+    path("password-reset/", PasswordResetRequestView.as_view(), name="password-reset",),
+
+    # Confirmation avec l'identifiant utilisateur et le token sécurisé.
+    path("password-reset-confirm/<uidb64>/<token>/", PasswordResetConfirmView.as_view(), 
+        name="password-reset-confirm",),
 
     # Déconnexion par invalidation du refresh token.
     path("logout/", LogoutView.as_view(), name="logout"),

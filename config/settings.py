@@ -167,13 +167,12 @@ STATIC_URL = 'static/'
 
 
 # Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
+# En développement, les e-mails sont affichés
+# directement dans le terminal Django.
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+DEFAULT_FROM_EMAIL = "AdmiGuide <noreply@admiguide.local>"
+
 
 # Configure JWT pour l'authentification et drf-spectacular pour générer la documentation de l'API.
 REST_FRAMEWORK = {
@@ -200,6 +199,13 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Documentation de l'API métier du projet AdmiGuide.",
     "VERSION": "1.0.0",
 }
+
+# URL utilisée pour construire les liens envoyés par e-mail.
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "http://localhost:4200",
+).rstrip("/")
+
 
 # URL du microservice AdmiGuide AI.
 AI_SERVICE_URL = os.getenv(
