@@ -34,6 +34,11 @@ class Command(BaseCommand):
             defaults={"sigle": ""},
         )
 
+        dgid, _ = Administration.objects.update_or_create(
+            nom="Direction générale des Impôts et des Domaines",
+            defaults={"sigle": "DGID"},
+        )
+
         service_passeports, _ = ServiceAdministratif.objects.update_or_create(
             administration=interieur,
             nom="Service des passeports ou représentation consulaire compétente",
@@ -70,6 +75,24 @@ class Command(BaseCommand):
             },
         )
 
+        service_domaines, _ = ServiceAdministratif.objects.update_or_create(
+            administration=dgid,
+            nom="Bureau des Domaines territorialement compétent",
+            defaults={
+                "adresse": "",
+                "contact": "",
+            },
+        )
+
+        service_conservation, _ = ServiceAdministratif.objects.update_or_create(
+            administration=dgid,
+            nom="Conservation de la propriété et des droits fonciers",
+            defaults={
+                "adresse": "",
+                "contact": "",
+            },
+        )
+
         self._configurer_passeport_perdu(service_passeports)
         self._configurer_retour_definitif(service_dgse)
         self._configurer_naissance_etranger(service_consulaire)
@@ -83,6 +106,14 @@ class Command(BaseCommand):
         )
         self._configurer_deces_fonctionnaire_retraite(
             service_pensions
+        )
+
+        self._configurer_regularisation_bail(
+            service_domaines
+        )
+
+        self._configurer_acquisition_mutation_titre_foncier(
+            service_conservation
         )
 
         self.stdout.write(
@@ -744,4 +775,177 @@ class Command(BaseCommand):
                 "demander-la-reversion-d-une-pension-de-retraite-"
                 "pour-un-fonctionnaire-decede-apres-la-retraite"
             ),
+        )
+
+
+    def _configurer_regularisation_bail(
+        self,
+        service,
+    ):
+        """Configure la régularisation foncière par voie de bail."""
+
+        demarche = self._demarche(
+            code="REGULARISATION_BAIL",
+            intitule="Régularisation par voie de bail",
+            description=(
+                "Démarche permettant à une personne physique "
+                "ou morale d'obtenir un bail sur un terrain "
+                "qu'elle occupe ou qu'elle a identifié et qui "
+                "dépend du domaine privé de l'État."
+            ),
+            cout="À confirmer auprès du service compétent",
+            delai="À confirmer auprès du service compétent",
+        )
+
+        self._reinitialiser_relations(
+            demarche,
+            [service],
+        )
+
+        self._synchroniser_etapes(
+            demarche,
+            [
+                (
+                    "Préparer la demande de régularisation "
+                    "par voie de bail."
+                ),
+                (
+                    "Réunir les pièces demandées et les préparer "
+                    "en cinq exemplaires."
+                ),
+                (
+                    "Déposer le dossier auprès du bureau des "
+                    "Domaines territorialement compétent."
+                ),
+            ],
+        )
+
+        self._synchroniser_pieces(
+            demarche,
+            [
+                (
+                    "Demande de régularisation par voie de bail",
+                    True,
+                ),
+                (
+                    "Photocopie du titre ou de la délibération",
+                    True,
+                ),
+                (
+                    "Photocopie du plan de masse",
+                    True,
+                ),
+                (
+                    "Photocopie du plan de situation",
+                    True,
+                ),
+                (
+                    "Photocopie de la carte nationale d'identité",
+                    True,
+                ),
+                (
+                    "Acte de vente enregistré",
+                    True,
+                ),
+            ],
+        )
+
+        self._ajouter_source(
+            demarche,
+            "Régularisation par voie de bail - DGID",
+            "https://www.dgid.sn/fiches/regularisation-bail",
+        )
+
+
+    def _configurer_acquisition_mutation_titre_foncier(
+        self,
+        service,
+    ):
+        """
+        Configure l'acquisition et la mutation
+        d'un bien déjà sous titre foncier.
+        """
+
+        demarche = self._demarche(
+            code="ACQUISITION_MUTATION_TITRE_FONCIER",
+            intitule=(
+                "Acquisition et mutation d'un bien "
+                "sous titre foncier"
+            ),
+            description=(
+                "Démarche concernant l'acquisition d'un immeuble "
+                "qui possède déjà un titre foncier et appartient "
+                "à un particulier, jusqu'à l'inscription du droit "
+                "de l'acquéreur au livre foncier."
+            ),
+            cout=(
+                "État de droits réels : généralement 500 à 1 500 FCFA ; "
+                "autres droits et taxes auprès du notaire"
+            ),
+            delai=(
+                "Délai réglementaire maximal de 30 jours ; "
+                "état de droits réels délivré en 3 jours"
+            ),
+        )
+
+        self._reinitialiser_relations(
+            demarche,
+            [service],
+        )
+
+        self._synchroniser_etapes(
+            demarche,
+            [
+                (
+                    "Demander au Conservateur un état de droits "
+                    "réels sur l'immeuble."
+                ),
+                (
+                    "Effectuer la déclaration préalable de "
+                    "transaction auprès du Directeur chargé "
+                    "des Domaines."
+                ),
+                (
+                    "Faire établir et signer l'acte de vente "
+                    "par le notaire avec l'acheteur et le vendeur."
+                ),
+                (
+                    "Le notaire transmet le dossier à la "
+                    "Conservation foncière pour l'enregistrement "
+                    "et la publicité foncière."
+                ),
+                (
+                    "Faire constater la mutation du bien au nom "
+                    "de l'acquéreur par un nouvel état de "
+                    "droits réels."
+                ),
+            ],
+        )
+
+        self._synchroniser_pieces(
+            demarche,
+            [
+                (
+                    "Copie du titre foncier "
+                    "(pour la demande d'état de droits réels)",
+                    True,
+                ),
+                (
+                    "Copie de la carte nationale d'identité "
+                    "(pour la demande d'état de droits réels)",
+                    True,
+                ),
+            ],
+        )
+
+        self._ajouter_source(
+            demarche,
+            "Régularisation d'un titre foncier (TF) - DGID",
+            "https://www.dgid.sn/fiches/regularisation-tf",
+        )
+
+        self._ajouter_source(
+            demarche,
+            "État de droits réels - DGID",
+            "https://www.dgid.sn/fiches/etat-droits-reels",
         )

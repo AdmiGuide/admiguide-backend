@@ -294,6 +294,18 @@ class PensionsDecesOrientationTest(APITestCase):
             description="Test.",
         )
 
+        DemarcheAdministrative.objects.create(
+            code="REGULARISATION_BAIL",
+            intitule="Régularisation par voie de bail",
+            description="Test.",
+        )
+
+        DemarcheAdministrative.objects.create(
+            code="ACQUISITION_MUTATION_TITRE_FONCIER",
+            intitule="Acquisition et mutation d'un bien sous titre foncier",
+            description="Test.",
+        )
+
     @patch(
         "orientations.services.orientation_service."
         "analyser_situation"
@@ -554,6 +566,321 @@ class PensionsDecesOrientationTest(APITestCase):
         donnees_envoyees = (
             mock_analyser.call_args.kwargs
         )
+
+        self.assertEqual(
+            donnees_envoyees["reponses"],
+            [],
+        )
+
+
+class FoncierOrientationTest(APITestCase):
+    """
+    Teste l'intégration Django du domaine FONCIER.
+
+    Le service IA est simulé pour que les tests Django
+    ne dépendent pas de Groq ni d'une connexion réseau.
+    """
+
+    def setUp(self):
+        """Crée le référentiel minimal attendu par le service."""
+
+        self.demarche_bail = DemarcheAdministrative.objects.create(
+            code="REGULARISATION_BAIL",
+            intitule="Régularisation par voie de bail",
+            description="Démarche foncière de test.",
+        )
+
+        self.demarche_tf = DemarcheAdministrative.objects.create(
+            code="ACQUISITION_MUTATION_TITRE_FONCIER",
+            intitule=(
+                "Acquisition et mutation d'un bien "
+                "sous titre foncier"
+            ),
+            description="Démarche foncière de test.",
+        )
+
+        # Les autres démarches sont nécessaires car
+        # OrientationService vérifie que tout le MVP est présent.
+        autres_demarches = [
+            (
+                "REMPLACEMENT_PASSEPORT_PERDU",
+                "Remplacement passeport perdu",
+            ),
+            (
+                "RETOUR_EFFETS_PERSONNELS",
+                "Retour effets personnels",
+            ),
+            (
+                "NAISSANCE_ETRANGER",
+                "Naissance à l'étranger",
+            ),
+            (
+                "REVERSION_PENSION_CAPITAL_DECES_ACTIVITE",
+                "Réversion pension et capital-décès",
+            ),
+            (
+                "REVERSION_PENSION_APRES_RETRAITE",
+                "Réversion pension après retraite",
+            ),
+        ]
+
+        for code, intitule in autres_demarches:
+            DemarcheAdministrative.objects.create(
+                code=code,
+                intitule=intitule,
+                description="Test.",
+            )
+
+    @patch(
+        "orientations.services.orientation_service."
+        "analyser_situation"
+    )
+    def test_situation_fonciere_a_preciser(
+        self,
+        mock_analyser,
+    ):
+        """Une situation foncière vague doit créer une question."""
+
+        mock_analyser.return_value = {
+            "statut": "PRECISIONS_REQUISES",
+            "questions": [
+                {
+                    "texte": (
+                        "Que souhaitez-vous faire concernant "
+                        "ce terrain ou ce bien ?"
+                    ),
+                    "type_question": "CHOIX_UNIQUE",
+                    "options": [
+                        "Obtenir un bail pour un terrain",
+                        (
+                            "Acheter un bien qui possède déjà "
+                            "un titre foncier"
+                        ),
+                        "Autre situation",
+                        "Je ne sais pas",
+                    ],
+                }
+            ],
+        }
+
+        situation = SituationAdministrative.objects.create(
+            description_initiale=(
+                "Je souhaite régulariser un terrain au Sénégal "
+                "mais je ne sais pas quelle démarche effectuer."
+            )
+        )
+
+        resultat = analyser_et_enregistrer(situation)
+
+        self.assertEqual(
+            resultat["statut"],
+            "PRECISIONS_REQUISES",
+        )
+
+        question = situation.questions.get()
+
+        self.assertEqual(
+            question.texte,
+            (
+                "Que souhaitez-vous faire concernant "
+                "ce terrain ou ce bien ?"
+            ),
+        )
+
+        self.assertEqual(
+            question.type_question,
+            "CHOIX_UNIQUE",
+        )
+
+        self.assertEqual(
+            question.options,
+            [
+                "Obtenir un bail pour un terrain",
+                (
+                    "Acheter un bien qui possède déjà "
+                    "un titre foncier"
+                ),
+                "Autre situation",
+                "Je ne sais pas",
+            ],
+        )
+
+        donnees_envoyees = mock_analyser.call_args.kwargs
+
+        self.assertEqual(
+            donnees_envoyees["reponses"],
+            [],
+        )
+
+        self.assertCountEqual(
+            donnees_envoyees["demarche_codes"],
+            MVP_DEMARCHE_CODES,
+        )
+
+    @patch(
+        "orientations.services.orientation_service."
+        "analyser_situation"
+    )
+    def test_orientation_regularisation_bail(
+        self,
+        mock_analyser,
+    ):
+        """Les précisions fournies permettent d'enregistrer le bail."""
+
+        situation = SituationAdministrative.objects.create(
+            description_initiale=(
+                "Je souhaite régulariser un terrain au Sénégal."
+            )
+        )
+
+        question1 = QuestionComplementaire.objects.create(
+            situation=situation,
+            texte=(
+                "Que souhaitez-vous faire concernant "
+                "ce terrain ou ce bien ?"
+            ),
+            type_question="CHOIX_UNIQUE",
+            options=[
+                "Obtenir un bail pour un terrain",
+                (
+                    "Acheter un bien qui possède déjà "
+                    "un titre foncier"
+                ),
+                "Autre situation",
+                "Je ne sais pas",
+            ],
+            ordre=1,
+        )
+
+        ReponseComplementaire.objects.create(
+            question=question1,
+            contenu="Obtenir un bail pour un terrain",
+        )
+
+        question2 = QuestionComplementaire.objects.create(
+            situation=situation,
+            texte=(
+                "Savez-vous si ce terrain dépend "
+                "du domaine privé de l'État ?"
+            ),
+            type_question="CHOIX_UNIQUE",
+            options=[
+                "Oui",
+                "Non",
+                "Je ne sais pas",
+            ],
+            ordre=2,
+        )
+
+        ReponseComplementaire.objects.create(
+            question=question2,
+            contenu="Oui",
+        )
+
+        mock_analyser.return_value = {
+            "statut": "ORIENTATION",
+            "demarche_code": "REGULARISATION_BAIL",
+            "resume": (
+                "L'utilisateur souhaite obtenir un bail "
+                "pour un terrain dépendant du domaine privé "
+                "de l'État."
+            ),
+            "avertissement": "",
+        }
+
+        resultat = analyser_et_enregistrer(situation)
+
+        self.assertEqual(
+            resultat["statut"],
+            "ORIENTATION",
+        )
+
+        self.assertEqual(
+            resultat["demarche_code"],
+            "REGULARISATION_BAIL",
+        )
+
+        situation.refresh_from_db()
+
+        self.assertEqual(
+            situation.orientation.demarche.code,
+            "REGULARISATION_BAIL",
+        )
+
+        donnees_envoyees = mock_analyser.call_args.kwargs
+
+        self.assertEqual(
+            donnees_envoyees["reponses"],
+            [
+                {
+                    "texte_question": question1.texte,
+                    "contenu": "Obtenir un bail pour un terrain",
+                },
+                {
+                    "texte_question": question2.texte,
+                    "contenu": "Oui",
+                },
+            ],
+        )
+
+    @patch(
+        "orientations.services.orientation_service."
+        "analyser_situation"
+    )
+    def test_orientation_acquisition_titre_foncier(
+        self,
+        mock_analyser,
+    ):
+        """
+        Une situation déjà claire doit enregistrer directement
+        l'acquisition d'un bien sous titre foncier.
+        """
+
+        mock_analyser.return_value = {
+            "statut": "ORIENTATION",
+            "demarche_code": (
+                "ACQUISITION_MUTATION_TITRE_FONCIER"
+            ),
+            "resume": (
+                "L'utilisateur souhaite acheter à un particulier "
+                "un bien qui possède déjà un titre foncier."
+            ),
+            "avertissement": "",
+        }
+
+        situation = SituationAdministrative.objects.create(
+            description_initiale=(
+                "Je souhaite acheter un terrain appartenant "
+                "à un particulier. Le terrain possède déjà "
+                "un titre foncier et je veux qu'il soit "
+                "inscrit à mon nom."
+            )
+        )
+
+        resultat = analyser_et_enregistrer(situation)
+
+        self.assertEqual(
+            resultat["statut"],
+            "ORIENTATION",
+        )
+
+        self.assertEqual(
+            resultat["demarche_code"],
+            "ACQUISITION_MUTATION_TITRE_FONCIER",
+        )
+
+        situation.refresh_from_db()
+
+        self.assertEqual(
+            situation.orientation.demarche.code,
+            "ACQUISITION_MUTATION_TITRE_FONCIER",
+        )
+
+        self.assertFalse(
+            situation.questions.exists()
+        )
+
+        donnees_envoyees = mock_analyser.call_args.kwargs
 
         self.assertEqual(
             donnees_envoyees["reponses"],
