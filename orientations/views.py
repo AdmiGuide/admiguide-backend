@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -22,7 +23,10 @@ from .serializers import (
 )
 
 # Services utilisés pour communiquer avec AdmiGuide AI.
-from .services.ai_service import AIServiceError
+from .services.ai_service import (
+    AIServiceError,
+    transcrire_audio,
+)
 from .services.orientation_service import (
     OrientationServiceError,
     analyser_et_enregistrer,
@@ -32,6 +36,9 @@ from referentiel.models import EtapeDemarche
 
 # Permet d'enregistrer plusieurs réponses dans une seule transaction.
 from django.db import transaction
+
+from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser
 
 class AIServiceUnavailable(APIException):
     """Erreur retournée lorsque le microservice IA est indisponible."""
@@ -53,6 +60,96 @@ def lancer_analyse(situation):
     except OrientationServiceError as exc:
         raise APIException(str(exc)) from exc
 
+
+class AudioTranscriptionView(APIView):
+    """
+    Reçoit un enregistrement vocal et retourne
+    sa transcription en texte.
+    """
+
+    # La saisie vocale est disponible sans compte,
+    # comme le parcours d'orientation.
+    permission_classes = [AllowAny]
+
+    # Indique explicitement que cette route
+    # reçoit un fichier en multipart/form-data.
+    parser_classes = [MultiPartParser]
+
+    @extend_schema(
+        request={
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {
+                    "audio": {
+                        "type": "string",
+                        "format": "binary",
+                    }
+                },
+                "required": ["audio"],
+            }
+        },
+    )
+    def post(self, request):
+        """Transmet l'audio au microservice AdmiGuide AI."""
+
+        # Récupère le fichier envoyé dans le champ "audio".
+        audio_file = request.FILES.get("audio")
+
+        if audio_file is None:
+            return Response(
+                {
+                    "detail": (
+                        "Aucun fichier audio n'a été envoyé."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Vérifie qu'il s'agit bien d'un contenu audio.
+        content_type = (
+            audio_file.content_type or ""
+        )
+
+        if not content_type.startswith("audio/"):
+            return Response(
+                {
+                    "detail": (
+                        "Le fichier envoyé doit être "
+                        "un fichier audio."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Limite la taille de l'enregistrement à 10 Mo
+        # afin d'éviter des fichiers inutilement volumineux.
+        max_size = 10 * 1024 * 1024
+
+        if audio_file.size > max_size:
+            return Response(
+                {
+                    "detail": (
+                        "Le fichier audio est trop volumineux."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Django joue ici le rôle d'intermédiaire :
+            # le nettoyage et la transcription sont effectués
+            # par le microservice FastAPI.
+            result = transcrire_audio(
+                audio_file
+            )
+
+        except AIServiceError as exc:
+            raise AIServiceUnavailable() from exc
+
+        return Response(
+            result,
+            status=status.HTTP_200_OK,
+        )
 
     
 class SituationCreateView(generics.CreateAPIView):

@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AudioTranscriptionView,
     QuestionListView,
     ReponseComplementaireView,
     SituationCreateView,
@@ -11,6 +12,12 @@ from .views import (
 )
 
 urlpatterns = [
+    # Transcrit un enregistrement vocal en texte.
+    path(
+        "transcribe/",
+        AudioTranscriptionView.as_view(),
+        name="audio-transcription",
+    ),
     # Enregistre la situation décrite par l'usager.
     path(
         "situations/", SituationCreateView.as_view(),
@@ -56,4 +63,5 @@ urlpatterns = [
         SuiviEtapeUpdateView.as_view(),
         name="situation-etape-update",
     ),
+    
 ]
