@@ -1,21 +1,21 @@
-from django.shortcuts import render
-from django.conf import settings
-from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
-from rest_framework import generics, status, serializers
-from django.utils.encoding import force_str
-from django.utils.http import urlsafe_base64_decode
-from rest_framework.permissions import (
+from django.shortcuts import render # type: ignore
+from django.conf import settings # type: ignore
+from django.contrib.auth.tokens import default_token_generator # type: ignore
+from django.core.mail import send_mail # type: ignore
+from django.utils.encoding import force_bytes # type: ignore
+from django.utils.http import urlsafe_base64_encode # type: ignore
+from rest_framework import generics, status, serializers # type: ignore
+from django.utils.encoding import force_str # type: ignore
+from django.utils.http import urlsafe_base64_decode # type: ignore
+from rest_framework.permissions import ( # type: ignore
     AllowAny,
     IsAdminUser,
     IsAuthenticated,
-)
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.tokens import RefreshToken
+) 
+from rest_framework.response import Response # type: ignore
+from rest_framework.views import APIView # type: ignore
+from rest_framework_simplejwt.exceptions import TokenError # type: ignore
+from rest_framework_simplejwt.tokens import RefreshToken # type: ignore
 
 from .models import User
 from .serializers import (
@@ -28,7 +28,7 @@ from .serializers import (
     PasswordResetConfirmSerializer,
 )
 from config.pagination import StandardPagination
-from rest_framework.filters import SearchFilter
+from rest_framework.filters import SearchFilter # type: ignore
 
 
 class RegisterView(generics.CreateAPIView):
@@ -89,6 +89,13 @@ class PasswordResetRequestView(APIView):
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[user.email],
             )
+
+            # Affiche un lien facile à copier pendant le développement.
+            if settings.DEBUG:
+                print(
+                    "\nLien de réinitialisation :\n"
+                    f"{reset_url}\n"
+                )
 
         return Response(
             {
