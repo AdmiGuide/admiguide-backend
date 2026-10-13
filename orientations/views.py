@@ -136,11 +136,18 @@ class AudioTranscriptionView(APIView):
             )
 
         try:
-            # Django joue ici le rôle d'intermédiaire :
-            # le nettoyage et la transcription sont effectués
-            # par le microservice FastAPI.
             result = transcrire_audio(
                 audio_file
+            )
+
+        except ValueError:
+            return Response(
+                {
+                    "detail": (
+                        "Le fichier audio envoyé est invalide."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         except AIServiceError as exc:

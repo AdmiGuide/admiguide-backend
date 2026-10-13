@@ -53,14 +53,10 @@ def analyser_situation(
 def transcrire_audio(audio_file) -> dict:
     """
     Transmet un enregistrement vocal à AdmiGuide AI
-    et retourne la transcription produite par le microservice.
+    et retourne sa transcription.
     """
 
     # Prépare le fichier pour un envoi en multipart/form-data.
-    #
-    # - audio_file.name : nom original du fichier ;
-    # - audio_file.file : contenu binaire réel du fichier reçu par Django ;
-    # - content_type    : type MIME, par exemple audio/webm ou audio/mpeg.
     files = {
         "audio": (
             audio_file.name,
@@ -71,21 +67,26 @@ def transcrire_audio(audio_file) -> dict:
     }
 
     try:
-        # Transmet directement l'enregistrement au microservice FastAPI.
-        #
-        # Django ne nettoie ni ne transcrit l'audio :
-        # ces traitements restent la responsabilité d'AdmiGuide AI.
+        # Django transmet l'audio au microservice IA.
         response = requests.post(
             f"{settings.AI_SERVICE_URL}/transcribe",
             files=files,
-
-            # Évite qu'une transcription trop longue
-            # bloque indéfiniment la requête Django.
             timeout=75,
         )
 
-        # Déclenche une exception si FastAPI retourne
-        # une erreur HTTP comme 400, 500 ou 503.
+    except requests.RequestException as exc:
+        raise AIServiceError(
+            "Le service de transcription est indisponible."
+        ) from exc
+
+    # Une erreur de validation FastAPI ne correspond
+    # pas à une indisponibilité du service.
+    if response.status_code == 400:
+        raise ValueError(
+            "Le fichier audio envoyé est invalide."
+        )
+
+    try:
         response.raise_for_status()
 
     except requests.RequestException as exc:
@@ -94,19 +95,17 @@ def transcrire_audio(audio_file) -> dict:
         ) from exc
 
     try:
-        # Convertit la réponse JSON de FastAPI
-        # en dictionnaire Python.
         data = response.json()
 
     except ValueError as exc:
         raise AIServiceError(
-            "Le service de transcription a retourné une réponse invalide."
+            "Le service de transcription a retourné "
+            "une réponse invalide."
         ) from exc
 
     transcription = data.get("transcription")
 
-    # Vérifie que la transcription existe réellement
-    # et qu'elle contient du texte exploitable.
+    # Vérifie que FastAPI a réellement retourné du texte.
     if (
         not isinstance(transcription, str)
         or not transcription.strip()
