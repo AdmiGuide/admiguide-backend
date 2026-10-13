@@ -37,9 +37,9 @@ class Command(BaseCommand):
 
         service_passeports, _ = ServiceAdministratif.objects.update_or_create(
             administration=interieur,
-            nom="Service des passeports",
+            nom="Commissariat de police dont relève le domicile",
             defaults={
-                "adresse": "",
+                "adresse": "Dakar - selon le domicile du demandeur",
                 "contact": "",
             },
         )
@@ -71,7 +71,19 @@ class Command(BaseCommand):
             },
         )
 
-        self._configurer_passeport_perdu(service_passeports)
+        self._supprimer_ancienne_demarche_passeport()
+
+        self._configurer_demande_passeport(
+            service_passeports
+        )
+
+        self._configurer_renouvellement_passeport(
+            service_passeports
+        )
+
+        self._configurer_passeport_perdu_ou_vole(
+            service_passeports
+        )
 
         # Remplace l'ancienne démarche unique liée au décès
         # par les deux nouvelles démarches.
@@ -239,21 +251,55 @@ class Command(BaseCommand):
             update_fields=["code"]
         )
 
-    def _configurer_passeport_perdu(
+    def _supprimer_ancienne_demarche_passeport(
+    self,
+    ):
+        """
+        Supprime l'ancienne démarche passeport devenue obsolète.
+
+        Les anciennes situations et orientations de développement
+        ayant été supprimées, aucune migration n'est nécessaire.
+        """
+
+        DemarcheAdministrative.objects.filter(
+            code="REMPLACEMENT_PASSEPORT_PERDU"
+        ).delete()
+
+        # Supprime également l'ancien service générique
+        # s'il n'est plus utilisé par aucune démarche.
+        ancien_service = (
+            ServiceAdministratif.objects
+            .filter(
+                nom="Service des passeports"
+            )
+            .first()
+        )
+
+        if (
+            ancien_service
+            and not ancien_service.demarches.exists()
+        ):
+            ancien_service.delete()
+
+
+    def _configurer_demande_passeport(
         self,
         service,
     ):
-        """Configure le remplacement d'un passeport sénégalais perdu."""
+        """Configure la première demande de passeport à Dakar."""
 
         demarche = self._demarche(
-            code="REMPLACEMENT_PASSEPORT_PERDU",
-            intitule="Remplacement d'un passeport perdu",
+            code="DEMANDE_PASSEPORT_ORDINAIRE",
+            intitule="Demande d'un passeport ordinaire",
             description=(
-                "Orientation pour déclarer la perte d'un passeport "
-                "sénégalais et préparer son remplacement."
+                "Démarche permettant à un citoyen sénégalais "
+                "résidant à Dakar de demander un passeport ordinaire."
             ),
-            cout="Variable selon le lieu de dépôt",
-            delai="Variable selon le service compétent",
+            cout="20 000 FCFA",
+            delai=(
+                "Délivrance : 2 semaines ; "
+                "rendez-vous à Dakar : 2 à 25 jours"
+            ),
         )
 
         self._reinitialiser_relations(
@@ -264,21 +310,22 @@ class Command(BaseCommand):
         self._synchroniser_etapes(
             demarche,
             [
-                "Déclarer la perte du passeport.",
                 (
-                    "Préparer les pièces justificatives "
-                    "demandées."
+                    "Préparer les pièces nécessaires "
+                    "à la demande de passeport."
                 ),
                 (
-                    "Identifier le service compétent et prendre "
-                    "rendez-vous si nécessaire."
+                    "Payer 20 000 FCFA auprès de la Direction "
+                    "de l'Enregistrement, des Domaines et du Timbre "
+                    "et obtenir la quittance."
                 ),
                 (
-                    "Déposer la demande de remplacement."
+                    "Prendre rendez-vous pour le dépôt à Dakar "
+                    "en utilisant le numéro de la quittance."
                 ),
                 (
-                    "Retirer le nouveau passeport selon "
-                    "les indications du service."
+                    "Déposer le dossier au commissariat de police "
+                    "dont relève le domicile."
                 ),
             ],
         )
@@ -287,21 +334,131 @@ class Command(BaseCommand):
             demarche,
             [
                 (
-                    "Certificat ou déclaration de perte",
+                    "Original de la carte nationale d'identité",
                     True,
                 ),
                 (
-                    "Carte nationale d'identité CEDEAO",
+                    "Copie certifiée conforme de la carte "
+                    "nationale d'identité",
                     True,
                 ),
                 (
-                    "Justificatif de domicile dans le pays "
-                    "de résidence",
+                    "Trois photos d'identité en couleur",
+                    True,
+                ),
+                (
+                    "Quittance de paiement de 20 000 FCFA",
+                    True,
+                ),
+                (
+                    "Autorisation parentale pour un mineur",
                     False,
                 ),
                 (
-                    "Justificatif de paiement ou timbre fiscal "
-                    "selon le service",
+                    "Copie certifiée conforme de la CNI "
+                    "du père ou de la mère pour un mineur",
+                    False,
+                ),
+                (
+                    "Certificat de prise en charge délivré "
+                    "par la mairie ou la justice pour un mineur",
+                    False,
+                ),
+                (
+                    "Extrait de naissance de moins de trois mois "
+                    "à la place de la CNI pour un enfant "
+                    "de moins de 5 ans",
+                    False,
+                ),
+                (
+                    "Carte d'étudiant valide ou certificat "
+                    "de scolarité pour bénéficier du traitement "
+                    "prioritaire",
+                    False,
+                ),
+            ],
+        )
+
+        self._ajouter_source(
+            demarche,
+            "Passeport ordinaire - Ministère de l'Intérieur",
+            (
+                "https://www.interieur.gouv.sn/services/"
+                "services-aux-usagers/passeport-ordinaire"
+            ),
+        )
+
+        self._ajouter_source(
+            demarche,
+            "Demander un passeport numérisé - e-Sénégal",
+            (
+                "https://e-senegal.sn/#/comprendre-ma-demarche/"
+                "demarche/demander-un-passeport-numerise"
+            ),
+        )
+
+
+    def _configurer_renouvellement_passeport(
+        self,
+        service,
+    ):
+        """Configure le renouvellement d'un passeport à Dakar."""
+
+        demarche = self._demarche(
+            code="RENOUVELLEMENT_PASSEPORT",
+            intitule="Renouvellement d'un passeport",
+            description=(
+                "Démarche permettant à un particulier résidant "
+                "à Dakar de renouveler son passeport sénégalais."
+            ),
+            cout="20 000 FCFA",
+            delai=(
+                "Délivrance : 2 semaines ; "
+                "rendez-vous à Dakar : 2 à 25 jours"
+            ),
+        )
+
+        self._reinitialiser_relations(
+            demarche,
+            [service],
+        )
+
+        self._synchroniser_etapes(
+            demarche,
+            [
+                (
+                    "Payer 20 000 FCFA auprès de la Direction "
+                    "de l'Enregistrement, des Domaines et du Timbre "
+                    "et obtenir la quittance."
+                ),
+                (
+                    "Préparer l'ancien passeport, sa copie "
+                    "et la quittance de paiement."
+                ),
+                (
+                    "Prendre rendez-vous pour le dépôt à Dakar "
+                    "en utilisant le numéro de la quittance."
+                ),
+                (
+                    "Déposer le dossier au commissariat de police "
+                    "dont relève le domicile."
+                ),
+            ],
+        )
+
+        self._synchroniser_pieces(
+            demarche,
+            [
+                (
+                    "Ancien passeport",
+                    True,
+                ),
+                (
+                    "Copie de l'ancien passeport",
+                    True,
+                ),
+                (
+                    "Quittance de paiement de 20 000 FCFA",
                     True,
                 ),
             ],
@@ -316,7 +473,127 @@ class Command(BaseCommand):
             ),
         )
 
-    
+        self._ajouter_source(
+            demarche,
+            "Demander un passeport numérisé - e-Sénégal",
+            (
+                "https://e-senegal.sn/#/comprendre-ma-demarche/"
+                "demarche/demander-un-passeport-numerise"
+            ),
+        )
+
+        self._ajouter_source(
+            demarche,
+            "Renouvellement de passeport - DGSE",
+            "https://dgse.gouv.sn/content/renouvellement-de-passeport",
+        )
+
+
+    def _configurer_passeport_perdu_ou_vole(
+        self,
+        service,
+    ):
+        """Configure le parcours d'un passeport perdu ou volé à Dakar."""
+
+        demarche = self._demarche(
+            code="PASSEPORT_PERDU_OU_VOLE",
+            intitule="Passeport perdu ou volé",
+            description=(
+                "Démarche permettant à un particulier résidant "
+                "à Dakar de refaire son passeport sénégalais "
+                "après une perte ou un vol."
+            ),
+            cout="20 000 FCFA",
+            delai=(
+                "Délivrance : 2 semaines ; "
+                "rendez-vous à Dakar : 2 à 25 jours"
+            ),
+        )
+
+        self._reinitialiser_relations(
+            demarche,
+            [service],
+        )
+
+        self._synchroniser_etapes(
+            demarche,
+            [
+                (
+                    "Déclarer la perte ou le vol auprès "
+                    "d'un commissariat de police et obtenir "
+                    "l'attestation correspondante."
+                ),
+                (
+                    "Payer 20 000 FCFA auprès de la Direction "
+                    "de l'Enregistrement, des Domaines et du Timbre "
+                    "et obtenir la quittance."
+                ),
+                (
+                    "Préparer les pièces nécessaires pour refaire "
+                    "la demande de passeport."
+                ),
+                (
+                    "Prendre rendez-vous pour le dépôt à Dakar "
+                    "en utilisant le numéro de la quittance."
+                ),
+                (
+                    "Déposer le nouveau dossier au commissariat "
+                    "de police dont relève le domicile."
+                ),
+            ],
+        )
+
+        self._synchroniser_pieces(
+            demarche,
+            [
+                (
+                    "Attestation de perte ou de vol délivrée "
+                    "par un commissariat de police",
+                    True,
+                ),
+                (
+                    "Original de la carte nationale d'identité",
+                    True,
+                ),
+                (
+                    "Copie certifiée conforme de la carte "
+                    "nationale d'identité",
+                    True,
+                ),
+                (
+                    "Trois photos d'identité en couleur",
+                    True,
+                ),
+                (
+                    "Quittance de paiement de 20 000 FCFA",
+                    True,
+                ),
+            ],
+        )
+
+        self._ajouter_source(
+            demarche,
+            "Passeport ordinaire - Ministère de l'Intérieur",
+            (
+                "https://www.interieur.gouv.sn/services/"
+                "services-aux-usagers/passeport-ordinaire"
+            ),
+        )
+
+        self._ajouter_source(
+            demarche,
+            "Demander un passeport numérisé - e-Sénégal",
+            (
+                "https://e-senegal.sn/#/comprendre-ma-demarche/"
+                "demarche/demander-un-passeport-numerise"
+            ),
+        )
+
+        self._ajouter_source(
+            demarche,
+            "Renouvellement de passeport - DGSE",
+            "https://dgse.gouv.sn/content/renouvellement-de-passeport",
+        )
 
     def _configurer_deces_fonctionnaire_activite(
         self,
