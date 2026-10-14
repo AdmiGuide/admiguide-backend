@@ -104,6 +104,10 @@ class Command(BaseCommand):
             service_conservation
         )
 
+        self._configurer_transformation_bail_titre_foncier(
+            service_domaines
+        )
+
         self.stdout.write(
             self.style.SUCCESS(
                 "Référentiel MVP synchronisé avec succès."
@@ -181,14 +185,20 @@ class Command(BaseCommand):
         demarche,
         titre,
         url,
+        source_type=TypeSource.PAGE_WEB,
+        description_courte="",
     ):
-        """Crée ou actualise une source officielle puis la relie."""
+        """
+        Crée ou actualise une source officielle
+        puis la relie à une démarche.
+        """
 
         source, _ = SourceAdministrative.objects.update_or_create(
             url=url,
             defaults={
                 "titre": titre,
-                "type": TypeSource.PAGE_WEB,
+                "description_courte": description_courte,
+                "type": source_type,
                 "statut": StatutSource.DISPONIBLE,
                 "date_consultation": timezone.now(),
             },
@@ -1051,4 +1061,171 @@ class Command(BaseCommand):
             demarche,
             "État de droits réels - DGID",
             "https://www.dgid.sn/fiches/etat-droits-reels",
+        )
+
+   
+    def _configurer_transformation_bail_titre_foncier(
+        self,
+        service,
+    ):
+        """
+        Configure la transformation d'un bail existant
+        en titre foncier pour un terrain domanial
+        à usage d'habitation.
+        """
+
+        demarche = self._demarche(
+            code="TRANSFORMATION_BAIL_EN_TITRE_FONCIER",
+            intitule="Transformer un bail en titre foncier",
+            description=(
+                "Démarche permettant au titulaire d'un bail "
+                "sur un terrain domanial à usage d'habitation "
+                "de demander la cession définitive du terrain "
+                "et son inscription en pleine propriété "
+                "au Livre foncier."
+            ),
+            cout=(
+                "Cession gratuite et exonérée de droits et taxes ; "
+                "frais possibles pour certains documents annexes"
+            ),
+            delai=(
+                "Environ 3 mois pour l'acte de cession définitive"
+            ),
+        )
+
+        # Le point d'entrée principal est le Bureau
+        # des Domaines territorialement compétent.
+        self._reinitialiser_relations(
+            demarche,
+            [service],
+        )
+
+        # Étapes principales de la procédure.
+        self._synchroniser_etapes(
+            demarche,
+            [
+                (
+                    "Préparer et déposer la demande de cession "
+                    "définitive auprès du Bureau des Domaines "
+                    "territorialement compétent."
+                ),
+                (
+                    "Joindre les documents permettant d'établir "
+                    "le bail et les droits détenus sur le terrain."
+                ),
+                (
+                    "Faire vérifier les conditions d'éligibilité "
+                    "du dossier, notamment la qualité d'attributaire "
+                    "et la mise en valeur du terrain."
+                ),
+                (
+                    "Faire constater la mise en valeur du terrain "
+                    "par les services compétents du Cadastre."
+                ),
+                (
+                    "Faire procéder au bornage lorsque la situation "
+                    "de la parcelle le nécessite."
+                ),
+                (
+                    "Le Bureau des Domaines transmet le dossier "
+                    "au Directeur chargé des Domaines pour la suite "
+                    "de l'instruction."
+                ),
+                (
+                    "Le dossier est examiné par la Commission "
+                    "de contrôle des opérations domaniales."
+                ),
+                (
+                    "Après avis favorable, le transfert en pleine "
+                    "propriété est prononcé par arrêté du ministre "
+                    "chargé des Domaines."
+                ),
+                (
+                    "Faire inscrire le nouveau droit de propriété "
+                    "au Livre foncier."
+                ),
+                (
+                    "Retirer la copie originale du titre foncier "
+                    "auprès du Conservateur compétent."
+                ),
+            ],
+        )
+
+        # Pièces nécessaires ou conditionnelles.
+        self._synchroniser_pieces(
+            demarche,
+            [
+                (
+                    "Demande de cession définitive",
+                    True,
+                ),
+                (
+                    "État de droits réels et/ou certificat "
+                    "permettant d'établir les droits sur le terrain",
+                    True,
+                ),
+                (
+                    "Document justifiant le bail ou le droit "
+                    "d'usage détenu sur le terrain",
+                    True,
+                ),
+                (
+                    "Jugement d'hérédité avec certificat "
+                    "de non-opposition ni appel, si l'attributaire "
+                    "est décédé",
+                    False,
+                ),
+                (
+                    "Certificat de paiement des droits de mutation "
+                    "par décès, si l'attributaire est décédé",
+                    False,
+                ),
+                (
+                    "Acte de partage homologué, lorsqu'il existe",
+                    False,
+                ),
+            ],
+        )
+
+        # définit notamment le principe de cession gratuite.
+        self._ajouter_source(
+        demarche,
+        "Loi n°2017-31",
+        (
+            "https://www.dri.gouv.sn/"
+            "loi-n%C2%B0-201731-du-15-juillet-2017"
+        ),
+        source_type=TypeSource.PAGE_WEB,
+        description_courte=(
+            "Base juridique de la cession gratuite"
+        ),
+    )
+
+        self._ajouter_source(
+            demarche,
+            "Décret n°2018-830",
+            (
+                "https://www.dgid.sn/storage/docs/"
+                "D%C3%A9cret%20d_application%20n%202018-830%20"
+                "%20autorisant%20la%20cession%20de-finitive%20"
+                "et%20a-%20titre%20gratuit%20de%20terrains%20"
+                "domaniaux%20a-%20usage%20d_habitation%5B1%5D.pdf"
+            ),
+            source_type=TypeSource.DOCUMENT,
+            description_courte=(
+                "Procédure de cession définitive du terrain"
+            ),
+        )
+
+        self._ajouter_source(
+            demarche,
+            "Magazine ID n°32 - DGID",
+            (
+                "https://www.dgid.sn/storage/magazine/"
+                "id-magazine-32-juil-sept-2022.pdf"
+            ),
+            source_type=TypeSource.DOCUMENT,
+            description_courte=(
+                "Constat de mise en valeur et bornage"
+            ),
         )

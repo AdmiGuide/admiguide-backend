@@ -202,7 +202,14 @@ class SourceAdministrative(models.Model):
         verbose_name="titre",
     )
 
+    description_courte = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="description courte",
+    )
+
     url = models.URLField(
+        max_length=1000,
         verbose_name="URL de la source",
     )
 

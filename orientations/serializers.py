@@ -189,6 +189,7 @@ class SituationResultSerializer(serializers.ModelSerializer):
         return [
             {
                 "titre": source.titre,
+                "description_courte": source.description_courte,
                 "url": source.url,
             }
             for source in sources
