@@ -39,7 +39,7 @@ class Command(BaseCommand):
             administration=interieur,
             nom="Commissariat de police dont relève le domicile",
             defaults={
-                "adresse": "Dakar - selon le domicile du demandeur",
+                "adresse": "",
                 "contact": "",
             },
         )
@@ -296,19 +296,19 @@ class Command(BaseCommand):
         self,
         service,
     ):
-        """Configure la première demande de passeport à Dakar."""
+        """Configure la première demande de passeport au Sénégal."""
 
         demarche = self._demarche(
             code="DEMANDE_PASSEPORT_ORDINAIRE",
             intitule="Demande d'un passeport ordinaire",
             description=(
                 "Démarche permettant à un citoyen sénégalais "
-                "résidant à Dakar de demander un passeport ordinaire."
+                "résidant au Sénégal de demander un passeport ordinaire."
             ),
             cout="20 000 FCFA",
             delai=(
-                "Délivrance : 2 semaines ; "
-                "rendez-vous à Dakar : 2 à 25 jours"
+                "Délivrance indicative : 2 semaines. "
+                "Modalités de dépôt à vérifier auprès du service compétent."
             ),
         )
 
@@ -330,7 +330,8 @@ class Command(BaseCommand):
                     "et obtenir la quittance."
                 ),
                 (
-                    "Prendre rendez-vous pour le dépôt à Dakar "
+                    "Vérifier les modalités de dépôt auprès du "
+                    "commissariat compétent. À Dakar, prendre rendez-vous "
                     "en utilisant le numéro de la quittance."
                 ),
                 (
@@ -412,19 +413,19 @@ class Command(BaseCommand):
         self,
         service,
     ):
-        """Configure le renouvellement d'un passeport à Dakar."""
+        """Configure le renouvellement d'un passeport au Sénégal."""
 
         demarche = self._demarche(
             code="RENOUVELLEMENT_PASSEPORT",
             intitule="Renouvellement d'un passeport",
             description=(
                 "Démarche permettant à un particulier résidant "
-                "à Dakar de renouveler son passeport sénégalais."
+                "au Sénégal de renouveler son passeport sénégalais."
             ),
             cout="20 000 FCFA",
             delai=(
-                "Délivrance : 2 semaines ; "
-                "rendez-vous à Dakar : 2 à 25 jours"
+                "Délivrance indicative : 2 semaines. "
+                "Modalités de dépôt à vérifier auprès du service compétent."
             ),
         )
 
@@ -446,7 +447,8 @@ class Command(BaseCommand):
                     "et la quittance de paiement."
                 ),
                 (
-                    "Prendre rendez-vous pour le dépôt à Dakar "
+                    "Vérifier les modalités de dépôt auprès du "
+                    "commissariat compétent. À Dakar, prendre rendez-vous "
                     "en utilisant le numéro de la quittance."
                 ),
                 (
@@ -503,20 +505,20 @@ class Command(BaseCommand):
         self,
         service,
     ):
-        """Configure le parcours d'un passeport perdu ou volé à Dakar."""
+        """Configure le parcours d'un passeport perdu ou volé au Sénégal."""
 
         demarche = self._demarche(
             code="PASSEPORT_PERDU_OU_VOLE",
             intitule="Passeport perdu ou volé",
             description=(
                 "Démarche permettant à un particulier résidant "
-                "à Dakar de refaire son passeport sénégalais "
+                "au Sénégal de refaire son passeport sénégalais "
                 "après une perte ou un vol."
             ),
             cout="20 000 FCFA",
             delai=(
-                "Délivrance : 2 semaines ; "
-                "rendez-vous à Dakar : 2 à 25 jours"
+                "Délivrance indicative : 2 semaines. "
+                "Modalités de dépôt à vérifier auprès du service compétent."
             ),
         )
 
@@ -543,7 +545,8 @@ class Command(BaseCommand):
                     "la demande de passeport."
                 ),
                 (
-                    "Prendre rendez-vous pour le dépôt à Dakar "
+                    "Vérifier les modalités de dépôt auprès du "
+                    "commissariat compétent. À Dakar, prendre rendez-vous "
                     "en utilisant le numéro de la quittance."
                 ),
                 (
