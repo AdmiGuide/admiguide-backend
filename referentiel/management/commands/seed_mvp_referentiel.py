@@ -485,21 +485,6 @@ class Command(BaseCommand):
             ),
         )
 
-        self._ajouter_source(
-            demarche,
-            "Demander un passeport numérisé - e-Sénégal",
-            (
-                "https://e-senegal.sn/#/comprendre-ma-demarche/"
-                "demarche/demander-un-passeport-numerise"
-            ),
-        )
-
-        self._ajouter_source(
-            demarche,
-            "Renouvellement de passeport - DGSE",
-            "https://dgse.gouv.sn/content/renouvellement-de-passeport",
-        )
-
 
     def _configurer_passeport_perdu_ou_vole(
         self,
