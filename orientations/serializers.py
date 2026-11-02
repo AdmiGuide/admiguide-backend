@@ -279,3 +279,61 @@ class SuiviEtapeUpdateSerializer(serializers.Serializer):
     """Valide l'état d'une étape de la feuille de route."""
 
     terminee = serializers.BooleanField()
+
+
+# ==========================================================
+# VALIDATION DES QUESTIONS DU CHATBOT
+# ==========================================================
+
+class ChatMessageSerializer(serializers.Serializer):
+    """Valide un message précédent de la discussion."""
+
+    role = serializers.ChoiceField(
+        choices=["user", "assistant"]
+    )
+
+    content = serializers.CharField(
+        min_length=1,
+        max_length=1500,
+    )
+
+
+class ChatQuestionSerializer(serializers.Serializer):
+    """Valide uniquement les données envoyées par Angular."""
+
+    question = serializers.CharField(
+        min_length=2,
+        max_length=600,
+    )
+
+    page = serializers.ChoiceField(
+        choices=["PRECISIONS", "RESULTAT", "SUIVI"]
+    )
+
+    # Identifiant de la question affichée sur
+    # la page « Quelques précisions ».
+    question_id = serializers.IntegerField(
+        min_value=1,
+        required=False,
+    )
+
+    terme_juridique = serializers.CharField(
+        max_length=150,
+        required=False,
+        allow_blank=True,
+    )
+
+    historique = ChatMessageSerializer(
+        many=True,
+        required=False,
+    )
+
+    def validate_historique(self, valeur):
+        """Limite le contexte aux six derniers messages."""
+
+        if len(valeur) > 6:
+            raise serializers.ValidationError(
+                "L'historique est limité à six messages."
+            )
+
+        return valeur

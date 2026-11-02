@@ -115,3 +115,55 @@ def transcrire_audio(audio_file) -> dict:
         )
 
     return data
+
+
+
+# ==========================================================
+# CHATBOT CONTEXTUEL
+# ==========================================================
+
+def interroger_chatbot(contexte: dict) -> dict:
+    """
+    Transmet une question et son contexte à FastAPI.
+
+    Le contexte doit être préparé par Django à partir
+    de la situation administrative accessible à l'usager.
+    """
+
+    try:
+        # Appelle le nouvel endpoint du chatbot.
+        response = requests.post(
+            f"{settings.AI_SERVICE_URL.rstrip('/')}/chat",
+            json=contexte,
+            timeout=(5, 105),
+        )
+
+        # Vérifie si FastAPI a retourné une erreur.
+        response.raise_for_status()
+
+    except requests.RequestException as exc:
+        raise AIServiceError(
+            "Le chatbot est temporairement indisponible."
+        ) from exc
+
+    try:
+        # Récupère la réponse JSON de FastAPI.
+        resultat = response.json()
+
+    except ValueError as exc:
+        raise AIServiceError(
+            "Le chatbot a retourné une réponse invalide."
+        ) from exc
+
+    # Vérifie la structure de la réponse.
+    if (
+        not isinstance(resultat, dict)
+        or not isinstance(resultat.get("reponse"), str)
+        or not resultat["reponse"].strip()
+        or not isinstance(resultat.get("sources"), list)
+    ):
+        raise AIServiceError(
+            "Le format de la réponse du chatbot est invalide."
+        )
+
+    return resultat

@@ -20,12 +20,14 @@ from .serializers import (
     SituationResultSerializer,
     SituationUpdateSerializer,
     SuiviEtapeUpdateSerializer,
+    ChatQuestionSerializer
 )
 
 # Services utilisés pour communiquer avec AdmiGuide AI.
 from .services.ai_service import (
     AIServiceError,
     transcrire_audio,
+    interroger_chatbot
 )
 from .services.orientation_service import (
     OrientationServiceError,
@@ -559,6 +561,160 @@ class SuiviEtapeUpdateView(generics.GenericAPIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+
+# ==========================================================
+# CHATBOT CONTEXTUEL
+# ==========================================================
+
+class SituationChatView(APIView):
+    """
+    Permet de poser une question sur une situation existante.
+
+    Django vérifie l'accès et prépare les informations
+    avant de transmettre la demande à FastAPI.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request, public_id):
+        """Traite une question du chatbot contextuel."""
+
+        # Vérifie que la situation appartient à l'utilisateur
+        # ou qu'elle est accessible en mode visiteur.
+        situation = get_accessible_situation(
+            request,
+            public_id,
+        )
+
+        # Valide uniquement les champs autorisés.
+        serializer = ChatQuestionSerializer(
+            data=request.data,
+        )
+        serializer.is_valid(raise_exception=True)
+
+        donnees = serializer.validated_data
+        page = donnees["page"]
+
+        # Le chatbot de suivi est réservé au
+        # propriétaire de la situation.
+        if page == "SUIVI":
+            if (
+                not request.user.is_authenticated
+                or situation.utilisateur_id != request.user.id
+            ):
+                raise NotFound("Situation introuvable.")
+
+        # Informations de la question complémentaire.
+        question_precision = None
+
+        if page == "PRECISIONS":
+
+            question_id = donnees.get("question_id")
+
+            if question_id is None:
+                return Response(
+                    {"detail": "Identifiant de question requis."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # La question doit appartenir à la situation
+            # et ne pas avoir déjà reçu une réponse.
+            question_obj = QuestionComplementaire.objects.filter(
+                id=question_id,
+                situation=situation,
+                reponse__isnull=True,
+            ).first()
+
+            if question_obj is None:
+                raise NotFound(
+                    "Question complémentaire introuvable."
+                )
+
+            question_precision = question_obj.texte
+
+            # Le terme demandé doit être présent dans
+            # la question ou dans ses choix proposés.
+            terme = donnees.get("terme_juridique", "").strip()
+
+            texte_question = " ".join([
+                question_obj.texte,
+                *(question_obj.options or []),
+            ])
+
+            if terme and terme.casefold() not in texte_question.casefold():
+                return Response(
+                    {"detail": "Terme absent de la question."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Récupère le résultat enregistré dans Django.
+        resultat = SituationResultSerializer(situation).data
+
+        if (
+            page in ("RESULTAT", "SUIVI")
+            and not resultat["demarche"]
+        ):
+            return Response(
+                {"detail": "Aucune démarche disponible."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Détermine le domaine à partir du code métier.
+        domaine = None
+
+        if resultat["demarche"]:
+            orientation = situation.orientation
+            code = orientation.demarche.code
+
+            if "PASSEPORT" in code:
+                domaine = "PASSEPORT"
+            elif "REVERSION" in code:
+                domaine = "PENSION"
+            elif "FONCIER" in code or "BAIL" in code:
+                domaine = "FONCIER"
+
+        # Prépare le contexte à partir de données fiables
+        # enregistrées dans la base Django.
+        contexte = {
+            "question": donnees["question"],
+            "page": page,
+            "situation": situation.description_initiale,
+            "domaine": domaine,
+            "demarche": (
+                resultat["demarche"]["intitule"]
+                if resultat["demarche"]
+                else None
+            ),
+            "etapes": [
+                etape["description"]
+                for etape in resultat["etapes"][:30]
+            ],
+            "pieces_a_preparer": [
+                piece["libelle"]
+                for piece in resultat["pieces_a_preparer"][:50]
+            ],
+            "services_competents": (
+                resultat["services_competents"][:10]
+            ),
+            "question_precision": question_precision,
+            "terme_juridique": donnees.get("terme_juridique"),
+            "historique": donnees.get("historique", []),
+        }
+
+        try:
+            # Communique avec le chatbot FastAPI.
+            reponse = interroger_chatbot(contexte)
+
+        except AIServiceError as exc:
+            raise AIServiceUnavailable() from exc
+
+        return Response(
+            reponse,
+            status=status.HTTP_200_OK,
+        )
+
 
 
 def get_accessible_situation(request, public_id):

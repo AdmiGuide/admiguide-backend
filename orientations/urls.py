@@ -9,6 +9,7 @@ from .views import (
     SituationResultView,
     SituationUpdateView,
     SuiviEtapeUpdateView,
+    SituationChatView
 )
 
 urlpatterns = [
@@ -62,6 +63,13 @@ urlpatterns = [
         "situations/<uuid:public_id>/etapes/<int:etape_id>/",
         SuiviEtapeUpdateView.as_view(),
         name="situation-etape-update",
+    ),
+
+    # Chatbot contextuel lié à une situation.
+    path(
+        "situations/<uuid:public_id>/chat/",
+        SituationChatView.as_view(),
+        name="situation-chat",
     ),
     
 ]
